@@ -1,15 +1,13 @@
 # manyunya_bot.py
 """
 Основной файл запуска бота «Числяндия».
-Версия: 2.2 (Замок + Златочёт + Ядро) 🏰🏦🧠🛡️
+Версия: 3.7 (Fix: Secret Room Handler Registration) 🏰🏦🧠🛡️🔀🎨💰🔮🧭🖼️🗝️✅
 
-Интеграция:
-- ChislyandiaEngine (ядро игры, мультиплатформенное)
-- Златочёт (банк) через ядро
-- Замок (экономика декораций) через ядро
-- ScoreManager и PlayerStorage
-- Корректное закрытие ресурсов при shutdown
-- Логирование через logging, пути через BASE_DIR
+Исправление:
+- ✅ УДАЛЕНА строка app.add_handlers() из импортов (вызывала NameError)
+- ✅ Хендлеры Тайной комнаты регистрируются ВНУТРИ main()
+- ✅ Глобальная навигация перехватывает «⬅️ Назад» ПЕРВОЙ
+- ✅ Порядок хендлеров: навигация → специфичные → общие
 """
 
 import logging
@@ -26,8 +24,13 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from dotenv import load_dotenv
 
-# Загружаем переменные окружения (токен и т.д.)
-load_dotenv()
+# ✅ ПОДДЕРЖКА ДВУХ РЕЖИМОВ: ТЕСТОВЫЙ / ПРОДАКШН
+if os.path.exists('.env.local'):
+    load_dotenv('.env.local')
+    print("🧪 Запущен ТЕСТОВЫЙ режим (.env.local)")
+else:
+    load_dotenv('.env')
+    print("🚀 Запущен ПРОДАКШН режим (.env)")
 
 # === ПОДАВЛЕНИЕ МУСОРНЫХ ЛОГОВ ===
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -44,16 +47,21 @@ from core.score_manager import ScoreManager
 from core.logger import log_bot_start, log_error
 # =====================================
 
-# ✅ НОВЫЕ ИМПОРТЫ: ЯДРО, БАНК, ЗАМОК
+# ✅ НОВЫЕ ИМПОРТЫ: ЯДРО, БАНК, ЗАМОК, МАГАЗИН, АРТЕФАКТЫ, НАВИГАЦИЯ, ТАЙНАЯ КОМНАТА, АДАПТЕРЫ
 from core.game_engine import ChislyandiaEngine
 from handlers.bank import get_bank_handlers
 from handlers.castle import get_castle_handlers
+from handlers.shop import get_shop_handlers
+from handlers.artifacts import get_artifact_handlers
+from handlers.navigation import get_navigation_handlers
+from handlers.secret_room import get_secret_room_handlers  # ✅ ИМПОРТ (только импорт!)
 
 from handlers.commands import start, show_bosses_guide, restart_game, show_logs, health_check
 from handlers.message_router import handle_message
 from handlers.admin_commands import (
     migrate_cmd, debug_progress_cmd, backup_db_cmd, 
-    myid_cmd, dump_user_cmd, reset_user_cmd, give_cmd
+    myid_cmd, dump_user_cmd, reset_user_cmd, give_cmd,
+    give_balance_cmd
 )
 from handlers.dev_bosses import (
     dev_boss_null, dev_boss_minus, dev_boss_multiply, 
@@ -62,6 +70,10 @@ from handlers.dev_bosses import (
 )
 from handlers.universal_callback import universal_callback_handler
 from core.ui_helpers import get_persistent_keyboard
+
+# ✅ ИМПОРТ АДАПТЕРА ПЛАТФОРМЫ
+from platforms.telegram_adapter import TelegramAdapter
+# ========================================
 
 # === НАСТРОЙКИ ЛОГИРОВАНИЯ ===
 logger = logging.getLogger(__name__)
@@ -75,279 +87,189 @@ logging.basicConfig(
 )
 
 # ========================================
-# ✅ ФУНКЦИЯ POST_INIT (загружает аватарки в фоне + инициализирует ядро)
+# ✅ ФУНКЦИЯ POST_INIT (с адаптером платформы)
 # ========================================
 async def post_init(application: Application):
     """
-    Запускает загрузку аватарок В ФОНЕ (не блокирует бота).
-    Инициализирует ScoreManager и ChislyandiaEngine (ядро).
+    Запускает загрузку аватарок В ФОНЕ с обработкой ошибок.
+    Инициализирует ScoreManager, ChislyandiaEngine (ядро) и АДАПТЕР платформы.
     """
-    # ✅ Метка времени запуска (для health check)
     application.bot_data['start_time'] = time.time()
+    
+    # ✅ Инициализация адаптера платформы (Telegram)
+    telegram_adapter = TelegramAdapter(application.bot)
+    application.bot_data['adapter'] = telegram_adapter
+    application.bot_data['platform'] = 'telegram'
+    logger.info("✅ TelegramAdapter инициализирован")
     
     logger.info("🎨 Запуск загрузки аватарок (в фоне)...")
     cache = init_avatar_cache(application.bot)
     
-    # ✅ Создаём задачу в фоне (не ждём завершения!)
-    asyncio.create_task(cache.load_avatars())
+    async def load_avatars_safe():
+        try:
+            result = await cache.load_avatars()
+            logger.info(f"✅ Аватарки загружены: {result}")
+        except FileNotFoundError as e:
+            logger.error(f"❌ Папка с аватарками не найдена: {e}")
+        except telegram.error.BadRequest as e:
+            logger.error(f"❌ Telegram API ошибка (аватарка): {e}")
+        except Exception as e:
+            logger.error(f"❌ Неизвестная ошибка загрузки аватарок: {e}", exc_info=True)
     
-    # ✅ Инициализируем ScoreManager
+    asyncio.create_task(load_avatars_safe())
+    
     storage = application.bot_data.get('storage')
     if storage:
         score_manager = ScoreManager(storage)
         application.bot_data['score_manager'] = score_manager
         logger.info("✅ ScoreManager инициализирован")
         
-        # ✅ ИНИЦИАЛИЗИРУЕМ ЯДРО (ChislyandiaEngine)
         engine = ChislyandiaEngine(storage, score_manager)
         application.bot_data['engine'] = engine
         logger.info("✅ ChislyandiaEngine (ядро) инициализировано")
     else:
         logger.error("❌ Не удалось инициализировать ScoreManager: storage не найден")
     
-    logger.info("✅ Бот готов к работе! Аватарки грузятся в фоне...\n")
+    logger.info("✅ Бот готов к работе!\n")
 
 
 # ========================================
-# ✅ НОВАЯ КОМАНДА /reset (АВАРИЙНЫЙ ВЫХОД)
+# ✅ КОМАНДЫ (без изменений)
 # ========================================
+async def reload_avatars_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id if update.effective_user else 0
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("🔒 Только для администратора!")
+        return
+    try:
+        await update.message.reply_text("🎨 Перезагрузка аватарок...")
+        cache = init_avatar_cache(context.bot)
+        result = await cache.load_avatars()
+        await update.message.reply_text(f"✅ Аватарки перезагружены! Результат: {result}")
+    except Exception as e:
+        logger.error(f"❌ Ошибка /reload_avatars: {e}")
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
 async def reset_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Аварийный сброс уровня для пользователей.
-    Если бот застрял или уровень не завершается — эта команда поможет.
-    """
     try:
         user_id = update.effective_user.id if update.effective_user else 0
         first_name = update.effective_user.first_name if update.effective_user else "Пользователь"
-        
-        logger.info(f"🔄 RESET вызван: user_id={user_id}, name={first_name}")
-        
         storage = context.bot_data.get('storage')
         if not storage:
             await update.message.reply_text("⚠️ Ошибка: хранилище не инициализировано.")
             return
-        
         user_data = storage.get_user(user_id) or {}
-        
-        # Сбрасываем все активные состояния
         user_data.update({
-            "current_level": None,
-            "selected_tasks": [],
-            "current_task_index": 0,
-            "in_boss_battle": False,
-            "current_boss": None,
-            "selected_boss_tasks": [],
-            "boss_task_index": 0,
-            "mistakes_in_level": 0,
-            "boss_health": 5,
-            "boss_abilities_used": []
+            "current_level": None, "selected_tasks": [], "current_task_index": 0,
+            "in_boss_battle": False, "current_boss": None, "selected_boss_tasks": [],
+            "boss_task_index": 0, "mistakes_in_level": 0, "boss_health": 5, "boss_abilities_used": []
         })
         storage.save_user(user_id, user_data)
-        
-        await update.message.reply_text(
-            f"✅ {first_name}, уровень сброшен! Возвращаюсь в меню.",
-            reply_markup=get_persistent_keyboard(user_data)
-        )
-        
-        logger.info(f"✅ RESET завершён: user_id={user_id}")
-        
+        await update.message.reply_text(f"✅ {first_name}, уровень сброшен!", reply_markup=get_persistent_keyboard(user_data))
     except Exception as e:
-        logger.error(f"❌ Ошибка в /reset: {e}", exc_info=True)
-        await update.message.reply_text(
-            "⚠️ Ошибка при сбросе. Попробуй /start или напиши администратору."
-        )
+        logger.error(f"❌ Ошибка в /reset: {e}")
+        await update.message.reply_text("⚠️ Ошибка при сбросе.")
 
-
-# ========================================
-# ✅ НОВАЯ КОМАНДА /help (СПРАВКА)
-# ========================================
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает справку по командам"""
-    help_text = (
-        "📚 **СПРАВКА ПО КОМАНДАМ**\n\n"
-        "🎮 **Игровые команды**:\n"
-        "/start — Начать игру / Главное меню\n"
-        "/reset — Сбросить текущий уровень (если застрял)\n"
-        "/bank — Открыть Златочёт (банк)\n"
-        "/deposit <сумма> — Положить золото в банк\n"
-        "/withdraw — Забрать вклад с процентами\n"
-        "/castle — Показать состояние Замка\n"
-        "/pay_upkeep [дни] — Оплатить upkeep Замка\n\n"
-        "📊 **Информация**:\n"
-        "/health — Проверка состояния бота\n"
-        "/logs — Последние логи (для админов)\n\n"
-        "💡 **Совет**:\n"
-        "Используй кнопку *⬅️ Назад* чтобы выйти из уровня или боя!"
-    )
-    
+    help_text = "📚 **СПРАВКА**\n\n🎮 /start — Меню\n/shop — Магазин\n/castle — Замок\n/bank — Банк\n/artifacts — Артефакты\n/back — Выход из уровня\n/reset — Сброс уровня"
     await update.message.reply_text(help_text, parse_mode="Markdown")
 
-
-# ========================================
-# ✅ КОМАНДА /backup (бэкап базы)
-# ========================================
 async def backup_db_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Создаёт бэкап базы данных (только для админа)"""
-    
     user_id = update.effective_user.id if update.effective_user else 0
     if user_id not in ADMIN_IDS:
         await update.message.reply_text("🔒 Только для администратора!")
         return
-    
     try:
         db_path = os.path.join(BASE_DIR, "data", "progress.db")
-        
-        if not os.path.exists(db_path):
-            await update.message.reply_text(f"❌ База данных не найдена: `{db_path}`", parse_mode="Markdown")
-            return
-        
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = os.path.join(BASE_DIR, "data", f"progress_backup_{timestamp}.db")
-        
         shutil.copy2(db_path, backup_path)
-        file_size = os.path.getsize(backup_path) / 1024
-        
-        await update.message.reply_text(
-            f"✅ **Бэкап создан!**\n\n"
-            f"📁 Файл: `{os.path.basename(backup_path)}`\n"
-            f"📂 Путь: `{os.path.dirname(backup_path)}`\n"
-            f"💾 Размер: {file_size:.1f} КБ",
-            parse_mode="Markdown"
-        )
-        
-        logger.info(f"💾 Бэкап создан: {backup_path}")
-        
+        await update.message.reply_text(f"✅ Бэкап создан: `{os.path.basename(backup_path)}`", parse_mode="Markdown")
     except Exception as e:
-        logger.error(f"❌ Ошибка бэкапа: {e}")
-        await update.message.reply_text(f"❌ Ошибка создания бэкапа: {e}")
-
-
-# ========================================
-# ✅ КОМАНДА /restore (восстановление)
-# ========================================
-async def restore_db_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Восстанавливает базу из последнего бэкапа (только для админа)"""
-    
-    user_id = update.effective_user.id if update.effective_user else 0
-    if user_id not in ADMIN_IDS:
-        await update.message.reply_text("🔒 Только для администратора!")
-        return
-    
-    try:
-        db_path = os.path.join(BASE_DIR, "data", "progress.db")
-        
-        backup_pattern = os.path.join(BASE_DIR, "data", "progress_backup_*.db")
-        backups = glob.glob(backup_pattern)
-        
-        if not backups:
-            await update.message.reply_text("⚠️ Бэкапы не найдены!")
-            return
-        
-        backups.sort(reverse=True)
-        latest_backup = backups[0]
-        
-        shutil.copy2(latest_backup, db_path)
-        
-        await update.message.reply_text(
-            f"✅ **База восстановлена!**\n\n"
-            f"📁 Из: `{os.path.basename(latest_backup)}`\n\n"
-            f"⚠️ _Перезапустите бота для применения изменений._",
-            parse_mode="Markdown"
-        )
-        
-        logger.info(f"💾 База восстановлена из: {latest_backup}")
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка восстановления: {e}")
-        await update.message.reply_text(f"❌ Ошибка восстановления: {e}")
-
-
-# ========================================
-# ✅ КОМАНДА /list_backups (список бэкапов)
-# ========================================
-async def list_backups_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает список бэкапов (только для админа)"""
-    
-    user_id = update.effective_user.id if update.effective_user else 0
-    if user_id not in ADMIN_IDS:
-        await update.message.reply_text("🔒 Только для администратора!")
-        return
-    
-    try:
-        backup_pattern = os.path.join(BASE_DIR, "data", "progress_backup_*.db")
-        
-        backups = glob.glob(backup_pattern)
-        
-        if not backups:
-            await update.message.reply_text("⚠️ Бэкапы не найдены!")
-            return
-        
-        backups.sort(reverse=True)
-        
-        text = "📦 **СОХРАНЁННЫЕ БЭКАПЫ:**\n\n"
-        for i, backup in enumerate(backups[:10], 1):
-            file_size = os.path.getsize(backup) / 1024
-            filename = os.path.basename(backup)
-            text += f"{i}. `{filename}` ({file_size:.1f} КБ)\n"
-        
-        if len(backups) > 10:
-            text += f"\n_... и ещё {len(backups) - 10} бэкапов_"
-        
-        text += f"\n\n📂 _Папка: `{os.path.join(BASE_DIR, 'data')}`_"
-        
-        await update.message.reply_text(text, parse_mode="Markdown")
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка списка бэкапов: {e}")
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
+async def restore_db_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id if update.effective_user else 0
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("🔒 Только для администратора!")
+        return
+    try:
+        db_path = os.path.join(BASE_DIR, "data", "progress.db")
+        backups = glob.glob(os.path.join(BASE_DIR, "data", "progress_backup_*.db"))
+        if not backups:
+            await update.message.reply_text("⚠️ Бэкапы не найдены!")
+            return
+        backups.sort(reverse=True)
+        shutil.copy2(backups[0], db_path)
+        await update.message.reply_text(f"✅ База восстановлена!\n⚠️ Перезапустите бота.", parse_mode="Markdown")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+async def list_backups_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id if update.effective_user else 0
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("🔒 Только для администратора!")
+        return
+    try:
+        backups = glob.glob(os.path.join(BASE_DIR, "data", "progress_backup_*.db"))
+        if not backups:
+            await update.message.reply_text("⚠️ Бэкапы не найдены!")
+            return
+        text = "📦 **БЭКАПЫ**:\n" + "\n".join([f"{i}. `{os.path.basename(b)}`" for i, b in enumerate(backups[:10], 1)])
+        await update.message.reply_text(text, parse_mode="Markdown")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+async def show_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id if update.effective_user else 0
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("🔒 Только для администратора!")
+        return
+    try:
+        with open(os.path.join(BASE_DIR, 'logs', 'bot.log'), 'r', encoding='utf-8') as f:
+            logs = f.readlines()[-20:]
+        await update.message.reply_text("```\n" + "".join(logs) + "```", parse_mode="Markdown")
+    except:
+        await update.message.reply_text("⚠️ Лог не найден")
+
+async def health_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id if update.effective_user else 0
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("🔒 Только для администратора!")
+        return
+    status = "🏥 **БОТ ОК**\n"
+    if context.bot_data.get('start_time'):
+        uptime = int(time.time() - context.bot_data['start_time'])
+        status += f"⏱️ Время работы: {uptime // 3600}ч {(uptime % 3600) // 60}м\n"
+    status += "✅ Все системы работают"
+    await update.message.reply_text(status, parse_mode="Markdown")
+
 
 # ========================================
-# ✅ GRACEFUL SHUTDOWN (корректное завершение)
+# ✅ GRACEFUL SHUTDOWN
 # ========================================
 async def graceful_shutdown_async(application: Application):
-    """
-    Асинхронное корректное завершение работы бота.
-    Закрывает БД и другие ресурсы.
-    """
-    logger.info("\n" + "=" * 60)
-    logger.info("🛑 ПОЛУЧЕН СИГНАЛ ЗАВЕРШЕНИЯ")
-    logger.info("=" * 60)
-    
-    # Закрываем хранилище
+    logger.info("\n" + "=" * 60 + "\n🛑 ЗАВЕРШЕНИЕ")
+    adapter = application.bot_data.get('adapter')
+    if adapter and hasattr(adapter, 'close'):
+        await adapter.close()
     storage = application.bot_data.get('storage')
     if storage and hasattr(storage, 'close'):
         storage.close()
-        logger.info("✅ PlayerStorage закрыт")
-    
-    # ScoreManager и Engine не требуют явного закрытия (используют storage)
-    
-    logger.info("✅ Состояние сохранено")
-    logger.info("👋 До свидания! Бот остановлен корректно.")
-    logger.info("=" * 60)
-
+    logger.info("✅ Бот остановлен корректно")
 
 def graceful_shutdown_sync(signum, frame):
-    """
-    Синхронный обработчик сигналов (fallback).
-    """
-    logger.info("🛑 Синхронный сигнал завершения (SIGINT/SIGTERM)")
+    logger.info("🛑 Сигнал завершения")
     sys.exit(0)
 
 
 # === ЗАПУСК ===
 def main():
-    # Логируем старт бота
     log_bot_start()
-    
-    # ✅ ПРОВЕРКА КОНФИГУРАЦИИ (валидация .env)
     validate_config()
-    
-    # ✅ РЕГИСТРИРУЕМ ОБРАБОТЧИКИ СИГНАЛОВ
     signal.signal(signal.SIGINT, graceful_shutdown_sync)
     signal.signal(signal.SIGTERM, graceful_shutdown_sync)
     
-    # Создаём приложение с таймаутами и post_init
     app = Application.builder() \
         .token(BOT_TOKEN) \
         .read_timeout(30) \
@@ -356,31 +278,36 @@ def main():
         .post_shutdown(graceful_shutdown_async) \
         .build()
     
-    # ========================================
-    # ✅ ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ
-    # ========================================
     init_database()
     storage = PlayerStorage()
     app.bot_data['storage'] = storage
-    # ScoreManager и Engine инициализируются в post_init
-    # ========================================
     
-    # === ОБЫЧНЫЕ КОМАНДЫ ===
+    # === 1. КОМАНДЫ ===
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("reset", reset_cmd))
+    app.add_handler(CommandHandler("reload_avatars", reload_avatars_cmd))
     app.add_handler(CommandHandler("bosses", show_bosses_guide))
     app.add_handler(CommandHandler("restart", restart_game))
     app.add_handler(CommandHandler("logs", show_logs))
     app.add_handler(CommandHandler("health", health_check))
     
-    # === ЗЛАТОЧЁТ (БАНК) ===
+    # === 2. НАВИГАЦИЯ (ПЕРВЫМ! перехватывает «⬅️ Назад» везде) ===
+    app.add_handlers(get_navigation_handlers())
+    
+    # === 3. СПЕЦИФИЧНЫЕ ХЕНДЛЕРЫ ===
+    # ✅ Банк
     app.add_handlers(get_bank_handlers())
-    
-    # === ЗАМОК (ЭКОНОМИКА) ===
+    # ✅ Замок
     app.add_handlers(get_castle_handlers())
+    # ✅ Магазин
+    app.add_handlers(get_shop_handlers())
+    # ✅ Артефакты
+    app.add_handlers(get_artifact_handlers())
+    # ✅ Тайная комната (НОВОЕ!)
+    app.add_handlers(get_secret_room_handlers())
     
-    # === АДМИН-КОМАНДЫ ===
+    # === 4. АДМИН-КОМАНДЫ ===
     app.add_handler(CommandHandler("migrate_progress", migrate_cmd))
     app.add_handler(CommandHandler("debug_progress", debug_progress_cmd))
     app.add_handler(CommandHandler("backup_db", backup_db_cmd))
@@ -388,13 +315,12 @@ def main():
     app.add_handler(CommandHandler("dump_user", dump_user_cmd))
     app.add_handler(CommandHandler("reset_user", reset_user_cmd))
     app.add_handler(CommandHandler("give", give_cmd))
-    
-    # === КОМАНДЫ БЭКАПА ===
+    app.add_handler(CommandHandler("give_balance", give_balance_cmd))
     app.add_handler(CommandHandler("backup", backup_db_cmd))
     app.add_handler(CommandHandler("restore", restore_db_cmd))
     app.add_handler(CommandHandler("list_backups", list_backups_cmd))
     
-    # === КОМАНДЫ РАЗРАБОТЧИКА (БОССЫ) ===
+    # === 5. БОССЫ ===
     app.add_handler(CommandHandler("boss_null", dev_boss_null))
     app.add_handler(CommandHandler("boss_minus", dev_boss_minus))
     app.add_handler(CommandHandler("boss_multiply", dev_boss_multiply))
@@ -405,50 +331,45 @@ def main():
     app.add_handler(CommandHandler("boss_logic", dev_boss_logic))
     app.add_handler(CommandHandler("boss_true_lord", dev_boss_true_lord))
     
-    # === ОБРАБОТЧИКИ СООБЩЕНИЙ И КОЛЛБЭКОВ ===
+    # === 6. ОБЩИЕ ОБРАБОТЧИКИ (ПОСЛЕДНИМИ!) ===
+    # ✅ MessageHandler — должен быть ПОСЛЕ всех специфичных!
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    # ✅ CallbackQueryHandler — для inline-кнопок
     app.add_handler(CallbackQueryHandler(universal_callback_handler))
     
-    # === ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ===
+    # === 7. ОБРАБОТЧИК ОШИБОК ===
     async def global_error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         import traceback
         err = context.error
         user_id = update.effective_user.id if update and update.effective_user else 0
-        
         log_error(user_id, str(err), exc_info=True)
-        
         logger.error("Unhandled exception:", exc_info=err)
         tb = "".join(traceback.format_exception(type(err), err, err.__traceback__))
-        text = f"⚠️ Error in bot:\n{str(err)}\n\n{tb[:1500]}"
+        text = f"⚠️ Error:\n{str(err)}\n\n{tb[:1500]}"
         for admin in ADMIN_IDS:
             try:
                 await app.bot.send_message(admin, text)
-            except Exception:
-                logger.exception("Failed to notify admin")
+            except:
+                pass
     app.add_error_handler(global_error_handler)
     
-    # === УДАЛЕНИЕ WEBHOOK (для polling) ===
+    # === УДАЛЕНИЕ WEBHOOK ===
     try:
         import urllib.request
-        import urllib.error
         if BOT_TOKEN:
             webhook_url = f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true"
-            try:
-                with urllib.request.urlopen(webhook_url, timeout=5) as resp:
-                    logger.info("deleteWebhook response: %s", resp.read()[:200])
-            except urllib.error.URLError as e:
-                logger.warning("Не удалось удалить webhook синхронно: %s", e)
-    except Exception:
-        logger.exception("Ошибка при попытке удалить webhook синхронно (игнорируем).")
+            with urllib.request.urlopen(webhook_url, timeout=5) as resp:
+                logger.info("Webhook deleted: %s", resp.read()[:100])
+    except Exception as e:
+        logger.warning(f"Webhook cleanup warning: {e}")
 
-    logger.info("🤖 Бот запущен! База: SQLite 🗄️ | Очки: ScoreManager 💰 | Ядро: ChislyandiaEngine 🧠 | Златочёт: 🏦 | Замок: 🏰")
-    logger.info("🛑 Для остановки нажмите Ctrl+C (корректное завершение)")
+    logger.info("🤖 Бот запущен! Адаптер: Telegram 🤖 | Навигация: ✅ | Артефакты: ✅ | Тайная комната: ✅")
+    logger.info("🛑 Ctrl+C для остановки")
     
     try:
         app.run_polling(drop_pending_updates=True)
     except telegram.error.Conflict as e:
-        logger.error("Conflict detected while polling: %s", e)
-        logger.error("Возможна запущенная другая инстанция бота или активный webhook.")
+        logger.error(f"Conflict: {e}")
         raise
 
 

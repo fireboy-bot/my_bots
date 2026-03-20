@@ -1,13 +1,15 @@
 # handlers/profile.py
 """
 Обработчики профиля, достижений и Замка.
-Версия: 2.0 (Score Manager Ready) 🗄️🎒💰
+Версия: 2.3 (Fix: Candels + Portrait Math Typos) 🗄️🎒💰🔮🕯️🖼️
 
 Изменения:
-- Показываем score_balance (валюта) и total_score (рейтинг) отдельно
-- logging вместо print()
-- Экранирование пользовательских данных
-- Безопасная работа с Markdown
+- ✅ Исправлены иконки артефактов (полное совпадение ID)
+- ✅ Показываем ВСЕ предметы (без обрезки после 7)
+- ✅ Показываем уровни артефактов в инвентаре
+- ✅ ИСПРАВЛЕНЫ ОПЕЧАТКИ: candels → 🕯️, portrait_maty → 🖼️
+- ✅ logging вместо print()
+- ✅ Экранирование пользовательских данных
 """
 
 import asyncio
@@ -70,9 +72,29 @@ def get_accuracy_info(tasks_correct: int, tasks_solved: int):
 def get_item_display(item_id: str):
     """
     Возвращает отображение предмета для инвентаря.
-    ✅ ПОЛНЫЙ СПИСОК ВСЕХ ПРЕДМЕТОВ ИЗ items.py
+    ✅ ВКЛЮЧАЕТ ВСЕ АРТЕФАКТЫ + ИСПРАВЛЕНИЯ ОПЕЧАТОК (candels, portrait_maty)
     """
+    # === 🔮 АРТЕФАКТЫ (ПЕРВЫМИ! для быстрого доступа) ===
+    artifact_items = {
+        "artifact_luck": {"emoji": "🍀", "name": "Артефакт Удачи", "rarity": "легендарный"},
+        "artifact_power": {"emoji": "⚡", "name": "Артефакт Силы", "rarity": "легендарный"},
+        "artifact_wisdom": {"emoji": "🧠", "name": "Артефакт Мудрости", "rarity": "легендарный"},
+    }
+    
+    # Проверяем артефакты СНАЧАЛА
+    item_lower = item_id.lower()
+    if item_lower in artifact_items:
+        item = artifact_items[item_lower]
+        return f"{item['emoji']} {item['name']} ✨"
+    
+    # === ВСЕ ОСТАЛЬНЫЕ ПРЕДМЕТЫ (включая варианты с опечатками) ===
     items = {
+        # === 🔮 ИСПРАВЛЕНИЯ ОПЕЧАТОК ===
+        "candels": {"emoji": "🕯️", "name": "Серебряные подсвечники", "rarity": "обычный"},
+        "candles": {"emoji": "🕯️", "name": "Серебряные подсвечники", "rarity": "обычный"},
+        "portrait_maty": {"emoji": "🖼️", "name": "Портрет Пифагора", "rarity": "обычный"},
+        "portrait_math": {"emoji": "🖼️", "name": "Портрет Пифагора", "rarity": "обычный"},
+        
         # === ОСТРОВ СЛОЖЕНИЯ ===
         "sum_gloves": {"emoji": "🧤", "name": "Перчатки Сумматора", "rarity": "обычный"},
         "unity_stone": {"emoji": "💎", "name": "Камень Единства", "rarity": "обычный"},
@@ -129,7 +151,7 @@ def get_item_display(item_id: str):
     }
     
     # Пытаемся найти предмет
-    item = items.get(item_id.lower())
+    item = items.get(item_lower)
     
     if item:
         rarity_emoji = {
@@ -143,9 +165,24 @@ def get_item_display(item_id: str):
         return f"{item['emoji']} {item['name']} {rarity_tag}".strip()
     
     # === FALLBACK: если предмет не найден ===
-    item_lower = item_id.lower()
+    # Обработка артефактов в fallback
+    if item_lower.startswith("artifact_"):
+        artifact_names = {
+            "artifact_luck": "🍀 Артефакт Удачи",
+            "artifact_power": "⚡ Артефакт Силы", 
+            "artifact_wisdom": "🧠 Артефакт Мудрости"
+        }
+        name = artifact_names.get(item_lower, item_id.replace("_", " ").title())
+        return f"{name} ✨"
     
-    if "sum" in item_lower or "add" in item_lower or "слож" in item_lower:
+    # ✅ ПРОВЕРКА НА ПОДОБИЕ (для опечаток)
+    if "candel" in item_lower or "candl" in item_lower:
+        return f"🕯️ Серебряные подсвечники"
+    elif "portrait" in item_lower and "maty" in item_lower:
+        return f"🖼️ Портрет Пифагора"
+    elif "portrait" in item_lower and "math" in item_lower:
+        return f"🖼️ Портрет Пифагора"
+    elif "sum" in item_lower or "add" in item_lower or "слож" in item_lower:
         return f"🧤 Перчатки Сложения"
     elif "sub" in item_lower or "minus" in item_lower or "вычит" in item_lower:
         return f"🧤 Перчатки Вычитания"
@@ -315,7 +352,7 @@ async def show_profile_and_rewards(update: Update, context: ContextTypes.DEFAULT
         f"🏝️ Пройдено островов: {islands_completed}/4\n\n"
     )
     
-    # Добавляем инвентарь
+    # Добавляем инвентарь — ✅ ПОКАЗЫВАЕМ ВСЕ ПРЕДМЕТЫ (без обрезки!)
     profile_text += "🎒 *Инвентарь*:\n"
     inventory = user_data.get("inventory", [])
     
@@ -336,14 +373,17 @@ async def show_profile_and_rewards(update: Update, context: ContextTypes.DEFAULT
             else:
                 if item_id not in displayed_items:
                     item_display = get_item_display(item_id)
+                    # ✅ Если артефакт — добавляем уровень
+                    if item_id.startswith("artifact_"):
+                        artifact_upgrades = user_data.get("artifact_upgrades", {})
+                        level = artifact_upgrades.get(item_id, 0)
+                        item_display = f"{item_display} (ур. {level})"
                     item_lines.append(f"▫️ {item_display}")
                     displayed_items.add(item_id)
         
-        for line in item_lines[:7]:
+        # ✅ ПОКАЗЫВАЕМ ВСЕ ПРЕДМЕТЫ (убрали ограничение [:7])
+        for line in item_lines:
             profile_text += line + "\n"
-        
-        if len(item_lines) > 7:
-            profile_text += f"▫️ ... и ещё {len(item_lines) - 7} предметов\n"
     else:
         profile_text += "▫️ Пусто (пора исследовать Числяндию!)\n"
     
@@ -500,7 +540,7 @@ async def show_castle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ========================================
-# ✅ ФУНКЦИЯ: ИНВЕНТАРЬ
+# ✅ ФУНКЦИЯ: ИНВЕНТАРЬ (ПОКАЗЫВАЕТ ВСЕ ПРЕДМЕТЫ)
 # ========================================
 async def show_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает только предметы + магазин/алхимия"""
@@ -534,7 +574,16 @@ async def show_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for item_id in inventory:
             if item_id not in displayed_items:
                 count = item_counts.get(item_id, 1)
-                item_display = get_item_display(item_id)
+                
+                # ✅ Если артефакт — получаем уровень
+                if item_id.startswith("artifact_"):
+                    artifact_upgrades = user_data.get("artifact_upgrades", {})
+                    level = artifact_upgrades.get(item_id, 0)
+                    base_display = get_item_display(item_id)
+                    item_display = f"{base_display} (ур. {level})"
+                else:
+                    item_display = get_item_display(item_id)
+                
                 if count > 1:
                     text += f"▫️ {item_display} ×{count}\n"
                 else:

@@ -1,292 +1,434 @@
 # handlers/shop.py
 """
-Магазин предметов Числяндии.
-Версия: 2.1 (Fix balance sync bug) 🗄️🛒💰🐛
-
-Исправление:
-- После spend_score() обновляем локальный progress["score_balance"]
-- Чтобы финальный save_user() не перезаписал новый баланс старым значением
+Магазин Числяндии — покупка предметов и артефактов.
+Версия: 5.0 (Shop Keeper Avatar + Vladimir Comments) 🛒🎩✅
 """
 
-import json
-import os
+import asyncio
 import logging
-from collections import Counter
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
-from config import BASE_DIR
-from items import SHOP_ITEMS
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from core.logger import log_user_action
+from core.ui_helpers import get_persistent_keyboard
+from items import SHOP_ITEMS, ARTIFACTS
+from handlers.narrative_manager import PhraseManager, send_character_message
 
 logger = logging.getLogger(__name__)
-
-
-def get_available_items(progress):
-    """
-    Возвращает список предметов, доступных для покупки.
-    """
-    unlocked_zones = set(progress.get("unlocked_zones", []))
-    inventory = set(progress.get("inventory", []))
-    
-    available = []
-    
-    # --- ОСТРОВ СЛОЖЕНИЯ (доступен всегда) ---
-    available.extend(["sum_gloves", "unity_stone"])
-    
-    # --- ОСТРОВ ВЫЧИТАНИЯ ---
-    if "subtraction" in unlocked_zones:
-        available.extend(["difference_dagger", "subtraction_shield", "ancient_amulet"])
-    
-    # --- УНИВЕРСАЛЬНЫЕ ПРЕДМЕТЫ ---
-    available.extend(["accuracy_amulet", "magic_hat"])
-    
-    # --- СПЕЦИАЛЬНЫЕ ПРЕДМЕТЫ ---
-    if progress.get("completed_normal_game", False):
-        available.append("math_crown")
-    
-    # Убираем уже купленные (permanent) или уже активные (temporary)
-    available = [item for item in available if item not in inventory]
-    
-    return available
-
-
-def get_shop_inline_keyboard(available_items, current_balance):
-    """Генерирует inline-кнопки ПОД сообщением"""
-    keyboard = []
-    
-    for item_id in available_items:
-        item = SHOP_ITEMS[item_id]
-        cost = item.get("cost_in_score", 0)
-        can_afford = current_balance >= cost
-        
-        if can_afford:
-            button_text = f"🛒 Купить {item['name']} ({cost})"
-            callback_data = f"buy_{item_id}"
-        else:
-            button_text = f"❌ {item['name']} ({cost}) — недоступно"
-            callback_data = "noop"
-        
-        keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
-    
-    # Кнопка возврата
-    keyboard.append([InlineKeyboardButton("⬅️ Назад в игру", callback_data="back_to_game")])
-    
-    return InlineKeyboardMarkup(keyboard)
+phrase_manager = PhraseManager()
 
 
 async def show_shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id if update.effective_user else 0
+    """Показать магазин — с аватаркой Торговца!"""
+    adapter = context.bot_data.get('adapter')
+    if not adapter:
+        await update.message.reply_text("⚠️ Ошибка: адаптер не инициализирован.")
+        return
+    
+    raw_user_id = update.effective_user.id if update.effective_user else 0
+    user_id = adapter.normalize_user_id(raw_user_id)
+    
+    log_user_action(user_id, "SHOP_OPEN")
     
     storage = context.bot_data.get('storage')
     if not storage:
-        await update.message.reply_text("⚠️ Ошибка: хранилище не инициализировано.")
+        await adapter.send_message(user_id, "⚠️ Ошибка: хранилище не инициализировано.")
         return
     
-    progress = storage.get_user(user_id) or {}
+    user_data = storage.get_user(user_id)
+    balance = user_data.get("score_balance", 0)
     
-    available_items = get_available_items(progress)
+    msg = "🛒 *ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН!*\n\n"
+    msg += f"💰 *Ваш баланс:* {balance:,} золотых\n\n"
+    msg += "*Категории:*\n"
+    msg += "🧪 Зелья и расходуемые предметы\n"
+    msg += "⚡ Артефакты (прокачиваемые бонусы)\n\n"
+    msg += "Выберите категорию:"
     
-    # ✅ ИСПРАВЛЕНО: используем score_balance как валюту
-    current_balance = progress.get("score_balance", 0)
-    total_rating = progress.get("total_score", 0)
+    keyboard = ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("🧪 Зелья"), KeyboardButton("⚡ Артефакты")],
+            [KeyboardButton("⬅️ Назад")],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=False
+    )
     
-    # Формируем подробный текст с описаниями
-    shop_text = "🧙‍️ **ЛАВКА ЧИСЛЯНДИИ**\n\n"
-    shop_text += f"💰 Твой баланс: *{current_balance} очков*\n"
-    shop_text += f"🏆 Твой рейтинг: *{total_rating} очков*\n\n"
-    shop_text += "Здесь ты можешь обменять очки на волшебные предметы!\n\n"
+    # ✅ ОТПРАВЛЯЕМ С АВАТАРКОЙ ТОРГОВЦА!
+    await send_character_message(
+        update, context, "shop_keeper",
+        "🛒 *ДОБРО ПОЖАЛОВАТЬ!*\n\n«Золото есть? Товар есть! Выбирай!»",
+        mood="calm"
+    )
     
-    # Добавляем список предметов с описаниями
-    for item_id in available_items:
-        item = SHOP_ITEMS[item_id]
-        cost = item.get("cost_in_score", 0)
-        can_afford = current_balance >= cost
+    await adapter.send_message(
+        user_id=user_id,
+        text=msg,
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
+
+async def show_potions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать зелья"""
+    adapter = context.bot_data.get('adapter')
+    if not adapter:
+        await update.message.reply_text("⚠️ Ошибка: адаптер не инициализирован.")
+        return
+    
+    raw_user_id = update.effective_user.id if update.effective_user else 0
+    user_id = adapter.normalize_user_id(raw_user_id)
+    
+    storage = context.bot_data.get('storage')
+    user_data = storage.get_user(user_id)
+    balance = user_data.get("score_balance", 0)
+    
+    msg = "🧪 *ЗЕЛЬЯ И РАСХОДУЕМЫЕ ПРЕДМЕТЫ*\n\n"
+    
+    for item_id, item in SHOP_ITEMS.items():
+        if item.get("type") == "consumable":
+            can_buy = "✅" if balance >= item.get("price", 0) else "❌"
+            msg += f"{can_buy} {item['name']} — {item['price']} золотых\n"
+    
+    msg += "\n_Нажми на предмет для покупки_"
+    
+    rows = [[KeyboardButton(item["name"])] for item_id, item in SHOP_ITEMS.items() if item.get("type") == "consumable"]
+    rows.append(["⬅️ Назад"])
+    
+    keyboard = ReplyKeyboardMarkup(rows, resize_keyboard=True)
+    
+    await adapter.send_message(
+        user_id=user_id,
+        text=msg,
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
+
+async def show_artifacts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Показать артефакты для покупки/улучшения.
+    ✅ Цена рассчитывается автоматически на основе текущего уровня!
+    """
+    adapter = context.bot_data.get('adapter')
+    if not adapter:
+        await update.message.reply_text("⚠️ Ошибка: адаптер не инициализирован.")
+        return
+    
+    raw_user_id = update.effective_user.id if update.effective_user else 0
+    user_id = adapter.normalize_user_id(raw_user_id)
+    
+    storage = context.bot_data.get('storage')
+    user_data = storage.get_user(user_id)
+    balance = user_data.get("score_balance", 0)
+    
+    # Получаем текущие уровни артефактов
+    artifact_upgrades = user_data.get("artifact_upgrades", {})
+    
+    msg = "🔮 *АРТЕФАКТЫ (ПРОКАЧИВАЕМЫЕ БОНУСЫ)*\n\n"
+    msg += "Нажми на артефакт для покупки или улучшения!\n"
+    msg += "Цена растёт с каждым уровнем.\n\n"
+    
+    for artifact_id, artifact in ARTIFACTS.items():
+        current_level = artifact_upgrades.get(artifact_id, 0)
         
-        status = "✅" if can_afford else "❌"
-        shop_text += f"{status} **{item['name']}**\n"
-        shop_text += f"   💰 Цена: {cost} очков\n"
-        shop_text += f"   ℹ️ {item['description']}\n\n"
+        # Рассчитываем цену следующего уровня
+        if current_level == 0:
+            price = artifact.get("base_price", 500)
+            level_text = "❌ Не куплен"
+        else:
+            # Формула: base_price × multiplier^level
+            price = int(artifact.get("base_price", 500) * (artifact.get("cost_multiplier", 1.4) ** current_level))
+            level_text = f"✅ Уровень {current_level}"
+        
+        can_buy = "✅" if balance >= price else "❌"
+        
+        msg += f"{can_buy} {artifact['name']}\n"
+        msg += f"   {level_text} | 💰 {price:,} золотых\n"
+        msg += f"   _Эффект: {artifact['description']}_\n\n"
     
-    if not available_items:
-        shop_text += "🔒 Нет доступных предметов.\n"
-        shop_text += "Пройди больше островов, чтобы открыть новые артефакты!"
-    else:
-        shop_text += "📌 **Как купить?**\n"
-        shop_text += "Нажми на кнопку под сообщением!"
+    msg += "💡 *Совет:* Улучшайте артефакты для увеличения бонусов!"
     
-    reply_markup = get_shop_inline_keyboard(available_items, current_balance)
+    rows = [[KeyboardButton(artifact["name"])] for artifact in ARTIFACTS.values()]
+    rows.append(["⬅️ Назад"])
     
-    # ✅ ИСПРАВЛЕНО: путь через BASE_DIR
-    image_path = os.path.join(BASE_DIR, 'images', 'shop_keeper.jpg')
+    keyboard = ReplyKeyboardMarkup(rows, resize_keyboard=True)
     
-    try:
-        with open(image_path, 'rb') as photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption=shop_text,
-                parse_mode="Markdown",
-                reply_markup=reply_markup
-            )
-    except FileNotFoundError:
-        logger.warning(f"🖼️ Аватарка не найдена: {image_path}")
-        await update.message.reply_text(
-            shop_text,
-            parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
-    except Exception as e:
-        logger.error(f"❌ Ошибка отправки магазина: {e}")
-        await update.message.reply_text("⚠️ Ошибка загрузки магазина. Попробуй позже.")
+    await adapter.send_message(
+        user_id=user_id,
+        text=msg,
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
 
 
-async def execute_purchase(user_id: int, item_id: str, storage, score_manager=None) -> tuple[bool, str]:
+async def buy_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Выполняет покупку предмета.
-    
-    Args:
-        user_id: ID пользователя
-        item_id: ID предмета
-        storage: Экземпляр PlayerStorage
-        score_manager: Экземпляр ScoreManager (опционально)
-    
-    Returns:
-        (success: bool, message: str)
+    Покупка предмета или улучшение артефакта.
+    ✅ Артефакты: цена рассчитывается автоматически!
+    ✅ Обычные предметы: через inventory
+    ✅ Владимир комментирует покупки если замок открыт
     """
-    progress = storage.get_user(user_id) or {}
-    inventory = progress.get("inventory", [])
+    adapter = context.bot_data.get('adapter')
+    if not adapter:
+        await update.message.reply_text("⚠️ Ошибка: адаптер не инициализирован.")
+        return
     
-    # ✅ ИСПРАВЛЕНО: используем score_balance как валюту
-    current_balance = progress.get("score_balance", 0)
+    raw_text = update.message.text.strip() if update.message else "NO_TEXT"
+    logger.info(f"🛒 buy_item вызван: text='{raw_text}'")
     
-    if item_id not in SHOP_ITEMS:
-        logger.error(f"❌ Предмет не найден в SHOP_ITEMS: {item_id}")
-        return False, "❌ Предмет не найден!"
+    raw_user_id = update.effective_user.id if update.effective_user else 0
+    user_id = adapter.normalize_user_id(raw_user_id)
     
-    item = SHOP_ITEMS[item_id]
-    cost = item.get("cost_in_score", 0)
-    item_type = item.get("type", "permanent")
+    item_name = update.message.text.strip()
     
-    # Проверки
-    if current_balance < cost:
-        return False, f"❌ Недостаточно очков (нужно {cost}, есть {current_balance})!"
+    storage = context.bot_data.get('storage')
+    user_data = storage.get_user(user_id)
+    balance = user_data.get("score_balance", 0)
     
-    # Для permanent-предметов: проверяем, не куплен ли уже
-    if item_type == "permanent" and item_id in inventory:
-        return False, "❌ Предмет уже куплен!"
+    item = None
+    item_type = None
     
-    # Проверка доступности по зонам
-    if item_id not in get_available_items(progress):
-        return False, "❌ Предмет ещё не открыт!"
+    # ✅ Ищем в обычных предметах (SHOP_ITEMS — это dict!)
+    for item_id, item_data in SHOP_ITEMS.items():
+        if item_data.get("name") == item_name:
+            item = {"id": item_id, **item_data}
+            item_type = "shop"
+            break
     
-    # ✅ СПИСАНИЕ ОЧКОВ ЧЕРЕЗ SCORE_MANAGER
-    if score_manager:
-        success, message = await score_manager.spend_score(
-            user_id=user_id,
-            amount=cost,
-            reason="shop_purchase",
-            context=item_id
+    # ✅ Ищем в артефактах (ARTIFACTS — это dict)
+    if not item:
+        for artifact_id, artifact_data in ARTIFACTS.items():
+            if artifact_data.get("name") == item_name:
+                # Рассчитываем цену на основе текущего уровня!
+                artifact_upgrades = user_data.get("artifact_upgrades", {})
+                current_level = artifact_upgrades.get(artifact_id, 0)
+                
+                if current_level == 0:
+                    price = artifact_data.get("base_price", 500)
+                else:
+                    # Формула: base_price × multiplier^level
+                    price = int(artifact_data.get("base_price", 500) * (artifact_data.get("cost_multiplier", 1.4) ** current_level))
+                
+                item = {
+                    "id": artifact_id,
+                    "name": item_name,
+                    "price": price,
+                    "current_level": current_level
+                }
+                item_type = "artifact"
+                break
+    
+    # ❌ Декорации больше не обрабатываются здесь — они в castle.py
+    if not item:
+        await adapter.send_message(user_id, "❌ Предмет не найден!\n\n💡 Декорации доступны в /castle → 🎨 Купить декорацию")
+        return
+    
+    item_price = item.get("price", 0)
+    if balance < item_price:
+        await adapter.send_message(
+            user_id,
+            f"❌ Недостаточно золотых! Нужно {item_price:,}, есть {balance:,}"
         )
+        return
+    
+    # ✅ ОБРАБОТКА АРТЕФАКТОВ — ЧЕРЕЗ upgrade_artifact()
+    if item_type == "artifact":
+        engine = context.bot_data.get('engine')
+        if not engine:
+            await adapter.send_message(user_id, "❌ Ошибка: ядро не инициализировано!")
+            return
+        
+        # Вызываем upgrade_artifact (это и покупка, и улучшение)
+        success, message = engine.upgrade_artifact(user_id, item["id"])
+        
         if not success:
-            return False, message
-        # ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: обновляем локальный progress после spend_score
-        # Чтобы финальный save_user() не перезаписал новый баланс старым значением
-        progress["score_balance"] = max(0, progress.get("score_balance", 0) - cost)
+            await adapter.send_message(user_id, message)
+            return
+        
+        # Обновляем user_data для отображения
+        user_data = storage.get_user(user_id)
+        
+        # ✅ Владимир комментирует ТОЛЬКО если замок открыт
+        if phrase_manager.is_castle_unlocked(user_data):
+            new_level = item.get("current_level", 1)
+            phrase = phrase_manager.get_vladimir_phrase(
+                "artifact_upgraded",
+                name=item["name"],
+                level=new_level
+            )
+            phrase_clean = phrase.replace("🎩 ", "", 1)
+            await send_character_message(
+                update, context, "vladimir",
+                f"{phrase_clean}\n\n✅ {item['name']} улучшен!\n💰 Списано: {item_price:,}",
+                mood="approve"
+            )
+        else:
+            await adapter.send_message(
+                user_id,
+                f"✅ *Покупка успешна!*\n\n"
+                f"🔮 {item['name']}\n"
+                f"💰 Списано: {item_price:,} золотых\n"
+                f"💵 Остаток: {user_data['score_balance']:,}",
+                parse_mode="Markdown"
+            )
+        
+        log_user_action(user_id, "ARTIFACT_PURCHASED", f"artifact={item['id']}, price={item_price}")
+        
+        await asyncio.sleep(1)
+        keyboard = get_persistent_keyboard(user_data, menu="main")
+        await adapter.send_message(
+            user_id,
+            "Что делаем дальше?",
+            reply_markup=keyboard
+        )
+        return
+    
+    # ✅ ОБРАБОТКА ОБЫЧНЫХ ПРЕДМЕТОВ — через inventory
+    user_data["score_balance"] = balance - item_price
+    
+    if item_type == "shop":
+        if "inventory" not in user_data:
+            user_data["inventory"] = []
+        user_data["inventory"].append(item["id"])
+        storage.save_user(user_id, user_data)
+    
+    # ✅ Владимир комментирует ТОЛЬКО если замок открыт
+    if phrase_manager.is_castle_unlocked(user_data):
+        # Особые фразы для рискованных предметов
+        if "Безум" in item["name"] or "Хаос" in item["name"]:
+            phrase = "«Зелье Безумия?.. Я уже приготовил совок... и смирительную рубашку на ваш размер.»"
+            mood = "relaxed"
+        elif "Смел" in item["name"]:
+            phrase = "«Зелье Смелости?.. Надеюсь, вы знаете что делаете, сударыня.»"
+            mood = "approve"
+        elif "Судьб" in item["name"]:
+            phrase = "«Кубик Судьбы?.. Азарт — это интересно. Но помните: порядок не любит случайности.»"
+            mood = "thinking"
+        else:
+            phrase = phrase_manager.get_vladimir_phrase("purchase_decoration").replace("🎩 ", "", 1)
+            mood = "approve"
+        
+        await send_character_message(
+            update, context, "vladimir",
+            f"{phrase}\n\n✅ {item['name']} куплен!\n💰 Списано: {item_price:,}",
+            mood=mood
+        )
     else:
-        # Fallback: прямое списание (если score_manager не инициализирован)
-        if current_balance < cost:
-            return False, "❌ Недостаточно очков!"
-        progress["score_balance"] = current_balance - cost
+        await adapter.send_message(
+            user_id,
+            f"✅ *Покупка успешна!*\n\n"
+            f"🛒 {item['name']}\n"
+            f"💰 Списано: {item_price:,} золотых\n"
+            f"💵 Остаток: {user_data['score_balance']:,}",
+            parse_mode="Markdown"
+        )
     
-    # Добавляем предмет в инвентарь (только если не был куплен)
-    if item_id not in inventory:
-        inventory.append(item_id)
-        progress["inventory"] = inventory
+    log_user_action(user_id, "ITEM_PURCHASED", f"item={item['name']}, price={item_price}")
     
-    # ✅ СОХРАНЯЕМ ЧЕРЕЗ PlayerStorage
-    storage.save_user(user_id, progress)
-    
-    logger.info(f"🛒 Пользователь {user_id} купил {item_id} за {cost} очков")
-    
-    return True, f"✨ Куплено: {item['name']}!"
+    await asyncio.sleep(1)
+    keyboard = get_persistent_keyboard(user_data, menu="main")
+    await adapter.send_message(
+        user_id,
+        "Что делаем дальше?",
+        reply_markup=keyboard
+    )
 
 
-def get_item_activation_message(item_id: str) -> str:
-    """Возвращает сообщение об активации эффекта предмета."""
-    if item_id not in SHOP_ITEMS:
-        return ""
+async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Вернуться в главное меню"""
+    adapter = context.bot_data.get('adapter')
+    if not adapter:
+        await update.message.reply_text("⚠️ Ошибка: адаптер не инициализирован.")
+        return
     
-    item = SHOP_ITEMS[item_id]
-    item_name = item["name"]
-    item_effect = item.get("effect")
-    item_type = item.get("type")
+    raw_user_id = update.effective_user.id if update.effective_user else 0
+    user_id = adapter.normalize_user_id(raw_user_id)
     
-    message = f"✨ Ты купила **{item_name}**!\n\n"
+    storage = context.bot_data.get('storage')
+    user_data = storage.get_user(user_id) if storage else {}
     
-    if item_type == "permanent":
-        message += "🔓 *Предмет добавлен в инвентарь навсегда!*\n\n"
-        if item_effect == "hint_is_free":
-            message += "🎯 *Эффект активирован!* Подсказки теперь бесплатны!"
-        elif item_effect == "ignore_mistake_penalty":
-            message += "🛡️ *Эффект активирован!* Ошибки больше не штрафуют!"
-        elif item_effect == "multiply_points_by_x":
-            message += "⭐ *Эффект активирован!* Очки за задачи умножаются!"
-    elif item_type == "island_bound_temporary":
-        message += "⏱️ *Эффект действует до конца острова!*\n\n"
-        if item_effect == "additive_progressive":
-            message += "🧤 *Эффект активирован!* За каждую задачу ты будешь получать больше очков!"
-        elif item_effect == "perfect_run_bonus":
-            message += "💎 *Эффект активирован!* Бонус за прохождение без ошибок!"
+    keyboard = get_persistent_keyboard(user_data, menu="main")
     
-    message += "\n\n💡 Предмет работает автоматически!"
-    
-    return message
+    await adapter.send_message(
+        user_id,
+        "🏰 *ГЛАВНОЕ МЕНЮ*\n\nВыберите действие:",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
 
 
 async def handle_shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик callback'ов магазина."""
+    """Обработка callback-кнопок магазина (для inline-кнопок)"""
     query = update.callback_query
     if not query:
         return
     
     await query.answer()
     
-    user_id = update.effective_user.id
     data = query.data
+    user_id = str(query.from_user.id)
+    
+    logger.info(f"🛒 Shop callback: {data}")
+    
+    parts = data.split("|")
+    item_data = {}
+    for part in parts:
+        if ":" in part:
+            key, _, value = part.partition(":")
+            item_data[key] = value
+    
+    item_id = item_data.get("id", "")
+    qty = int(item_data.get("qty", 1))
+    
+    item = None
+    for iid, i in SHOP_ITEMS.items():
+        if iid == item_id:
+            item = i
+            break
+    
+    if not item:
+        await query.edit_message_text("❌ Предмет не найден!")
+        return
     
     storage = context.bot_data.get('storage')
-    score_manager = context.bot_data.get('score_manager')
+    user_data = storage.get_user(user_id)
+    balance = user_data.get("score_balance", 0)
     
-    if not storage:
-        await query.edit_message_text("⚠️ Ошибка: хранилище не инициализировано.")
+    item_price = item.get("price", 0)
+    if balance < item_price * qty:
+        await query.edit_message_text(
+            f"❌ Недостаточно золотых! Нужно {item_price * qty:,}, есть {balance:,}"
+        )
         return
     
-    # Обрабатываем ТОЛЬКО команды магазина
-    if not (data == "back_to_game" or data.startswith("buy_")):
-        return
+    user_data["score_balance"] = balance - (item_price * qty)
+    if "inventory" not in user_data:
+        user_data["inventory"] = []
+    user_data["inventory"].append(item_id)
+    storage.save_user(user_id, user_data)
     
-    if data == "back_to_game":
-        if query.message.photo:
-            await query.edit_message_caption("Возвращаюсь в игру...")
-        else:
-            await query.edit_message_text("Возвращаюсь в игру...")
-        return
+    await query.edit_message_text(
+        f"✅ *Покупка успешна!*\n\n"
+        f"🛒 {item.get('name', item_id)} x{qty}\n"
+        f"💰 Списано: {item_price * qty:,} золотых",
+        parse_mode="Markdown"
+    )
     
-    if data.startswith("buy_"):
-        item_id = data[4:]
-        
-        success, message = await execute_purchase(user_id, item_id, storage, score_manager)
-        
-        if success:
-            activation_message = get_item_activation_message(item_id)
-        else:
-            activation_message = message
-        
-        # Универсальное редактирование
-        try:
-            if query.message.photo:
-                await query.edit_message_caption(activation_message, parse_mode="Markdown")
-            else:
-                await query.edit_message_text(activation_message, parse_mode="Markdown")
-        except Exception as e:
-            logger.warning(f"⚠️ Не удалось отредактировать сообщение: {e}")
-            # Если редактирование не удалось, отправляем новое сообщение
-            await update.effective_message.reply_text(activation_message, parse_mode="Markdown")
+    log_user_action(user_id, "ITEM_PURCHASED_CALLBACK", f"item={item.get('name', item_id)}, qty={qty}")
+
+
+def get_shop_handlers():
+    """Возвращает список хендлеров магазина"""
+    return [
+        CommandHandler("shop", show_shop),
+        MessageHandler(filters.Text("🧪 Зелья") & ~filters.COMMAND, show_potions),
+        MessageHandler(filters.Text("⚡ Артефакты") & ~filters.COMMAND, show_artifacts),
+        MessageHandler(filters.Text("⬅️ Назад") & ~filters.COMMAND, back_to_menu),
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND & 
+            (filters.Text("🧪 Зелье Здоровья") | filters.Text("🧪 Зелье Мудрости") |
+             filters.Text("🍀 Артефакт Удачи") | filters.Text("⚡ Артефакт Силы") |
+             filters.Text("🧠 Артефакт Мудрости")),
+            buy_item
+        ),
+    ]

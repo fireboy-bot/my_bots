@@ -1,6 +1,6 @@
 ﻿"""
 SQLite хранилище прогресса пользователей.
-Версия: 2.4 (Fix: bank_data deserialization) 🗄️✅
+Версия: 2.9 (Player Profile DB Column Fix) 🗄️🎩💾✅
 """
 
 import sqlite3
@@ -42,12 +42,15 @@ def get_db_path() -> str:
 
 
 class PlayerStorage:
+    # ✅ JSON-поля которые хранятся как JSON в БД
     JSON_FIELDS = [
         'defeated_bosses', 'completed_zones', 'inventory', 'rewards', 
         'abilities', 'unlocked_zones', 'achievements', 'castle_decorations', 
-        'artifact_upgrades', 'bank_data'
+        'artifact_upgrades', 'bank_data', 'castle_data',
+        'player_profile'  # ← Профиль для Владимира + сложность + лор
     ]
     
+    # ✅ Поля игрового состояния — упаковываются в JSON-колонку game_state
     GAME_STATE_FIELDS = [
         'current_level', 'current_task_index', 'mistakes_in_level',
         'in_boss_battle', 'in_secret_level', 'current_boss', 'boss_health',
@@ -57,6 +60,8 @@ class PlayerStorage:
         'selected_boss_tasks', 'boss_abilities_used'
     ]
     
+    # ✅ Колонки в таблице БД
+    # ✅ ДОБАВЛЕНО: player_profile
     DB_COLUMNS = [
         'user_id', 'username', 'first_name',
         'level', 'xp', 'xp_to_next',
@@ -65,12 +70,27 @@ class PlayerStorage:
         'defeated_bosses', 'completed_zones', 'inventory', 'unlocked_zones',
         'rewards', 'abilities', 'achievements', 'castle_decorations', 'artifact_upgrades',
         'game_state', 'created_at', 'updated_at',
-        'bank_data'
+        'bank_data', 'castle_data', 'player_profile'  # ← НОВОЕ!
     ]
     
     def __init__(self):
         self.conn = get_connection()
         logger.info(f"✅ PlayerStorage инициализирован: {DB_FILE}")
+        
+        # ✅ ПРОВЕРЯЕМ ЧТО КОЛОНКА player_profile СУЩЕСТВУЕТ
+        self._ensure_player_profile_column()
+    
+    def _ensure_player_profile_column(self):
+        """Добавляет колонку player_profile если её нет."""
+        cursor = self.conn.cursor()
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        if 'player_profile' not in columns:
+            logger.info("🔧 Добавляем колонку player_profile...")
+            cursor.execute("ALTER TABLE users ADD COLUMN player_profile TEXT")
+            self.conn.commit()
+            logger.info("✅ Колонка player_profile добавлена!")
     
     def get_db_path(self) -> str:
         return get_db_path()
@@ -84,23 +104,24 @@ class PlayerStorage:
         
         # Десериализуем JSON-поля
         for field in self.JSON_FIELDS:
-            if field in data and data[field] is not None:  # ✅ FIX: проверяем на None, а не на truthiness
+            if field in data and data[field] is not None:
                 try:
                     data[field] = json.loads(data[field])
                 except (json.JSONDecodeError, TypeError):
-                    data[field] = [] if field not in ['achievements', 'artifact_upgrades', 'bank_data'] else {}
+                    data[field] = [] if field not in ['achievements', 'artifact_upgrades', 'bank_data', 'castle_data', 'player_profile'] else {}
             elif field in data:
-                data[field] = [] if field not in ['achievements', 'artifact_upgrades', 'bank_data'] else {}
+                data[field] = [] if field not in ['achievements', 'artifact_upgrades', 'bank_data', 'castle_data', 'player_profile'] else {}
         
-        # ✅ FIX: Десериализуем bank_data отдельно с правильной проверкой
-        if 'bank_data' in data:
-            if data['bank_data'] is None:
-                data['bank_data'] = {}
-            elif isinstance(data['bank_data'], str):
-                try:
-                    data['bank_data'] = json.loads(data['bank_data'])
-                except (json.JSONDecodeError, TypeError):
-                    data['bank_data'] = {}
+        # ✅ FIX: Десериализуем bank_data, castle_data и player_profile отдельно
+        for field in ['bank_data', 'castle_data', 'player_profile']:
+            if field in data:
+                if data[field] is None:
+                    data[field] = {}
+                elif isinstance(data[field], str):
+                    try:
+                        data[field] = json.loads(data[field])
+                    except (json.JSONDecodeError, TypeError):
+                        data[field] = {}
         
         # Десериализуем game_state и "распаковываем" его в корень
         if 'game_state' in data and data['game_state']:
@@ -118,9 +139,24 @@ class PlayerStorage:
         if not data.get('unlocked_zones'):
             data['unlocked_zones'] = ['addition']
             
-        # Гарантируем score_balance (если колонка была добавлена, но пустая)
+        # Гарантируем score_balance
         if data.get('score_balance') is None:
             data['score_balance'] = data.get('total_score', 0)
+        
+        # ✅ Гарантируем castle_data
+        if 'castle_data' not in data:
+            data['castle_data'] = {"decorations": [], "upkeep_paid_until": None}
+        
+        # ✅ Гарантируем player_profile
+        if 'player_profile' not in data or not data['player_profile']:
+            data['player_profile'] = {
+                "greed": 0, "risk": 0, "logic": 0, "persistence": 0, "creativity": 0,
+                "boss_stats": {"bosses_defeated": [], "attempts_per_boss": {}, "final_boss_attempts": 0, "best_accuracy": 0.0},
+                "difficulty_profile": {"avg_accuracy": 0.0, "avg_response_time": 0.0, "hint_usage": 0, "streak_best": 0, "streak_current": 0},
+                "secret_room": {"attempts_today": 0, "last_visit": None, "last_visit_date": None, "total_visits": 0, "streak": 0, "lore_seen": []},
+                "weaknesses": {}, "strengths": {},
+                "last_comment": 0, "mystery_unlocked": False, "comment_count": 0,
+            }
         
         return data
     
@@ -134,7 +170,7 @@ class PlayerStorage:
                 game_state[key] = value
             elif key in self.JSON_FIELDS and key in self.DB_COLUMNS:
                 if value is None:
-                    value = [] if key not in ['achievements', 'artifact_upgrades', 'bank_data'] else {}
+                    value = [] if key not in ['achievements', 'artifact_upgrades', 'bank_data', 'castle_data', 'player_profile'] else {}
                 result[key] = json.dumps(value, ensure_ascii=False) if value else None
             elif key in self.DB_COLUMNS and key not in ['game_state', 'created_at', 'user_id']:
                 result[key] = value
@@ -168,7 +204,51 @@ class PlayerStorage:
                 "unlocked_zones": ["addition"], "completed_zones": [], "defeated_bosses": [],
                 "inventory": [], "rewards": [], "abilities": [],
                 "achievements": {}, "castle_decorations": [], "artifact_upgrades": {},
-                "bank_data": {},  # ✅ НОВОЕ: для Златочёта
+                "bank_data": {},
+                "castle_data": {"decorations": [], "upkeep_paid_until": None},
+                # ✅ ТАЙНАЯ КОМНАТА — значения по умолчанию:
+                "secret_room_level": 1,
+                "secret_room_exp": 0,
+                "secret_room_items": [],
+                "secret_room_logs": [],
+                "secret_room_last_event": None,
+                # 🎩 ВЛАДИМИР + СЛОЖНОСТЬ + ЛОР — значения по умолчанию:
+                "player_profile": {
+                    # Поведение (для реакций Владимира)
+                    "greed": 0, "risk": 0, "logic": 0, "persistence": 0, "creativity": 0,
+                    # Боссы
+                    "boss_stats": {
+                        "bosses_defeated": [],
+                        "attempts_per_boss": {},
+                        "final_boss_attempts": 0,
+                        "best_accuracy": 0.0,
+                    },
+                    # Динамическая сложность
+                    "difficulty_profile": {
+                        "avg_accuracy": 0.0,
+                        "avg_response_time": 0.0,
+                        "hint_usage": 0,
+                        "streak_best": 0,
+                        "streak_current": 0,
+                    },
+                    # Тайная комната: ежедневный доступ + лор
+                    "secret_room": {
+                        "attempts_today": 0,
+                        "last_visit": None,
+                        "last_visit_date": None,
+                        "total_visits": 0,
+                        "streak": 0,
+                        "lore_seen": [],
+                    },
+                    # Слабости/силы по темам (для адаптивных задач)
+                    "weaknesses": {},
+                    "strengths": {},
+                    # Системные
+                    "last_comment": 0,
+                    "mystery_unlocked": False,
+                    "comment_count": 0,
+                },
+                # Игровое состояние:
                 "in_boss_battle": False, "current_boss": None, "current_level": None,
                 "selected_tasks": [], "current_task_index": 0, "first_time": True,
                 "completed_normal_game": False, "soul_shards": 0, "absolute_victory": False
@@ -203,6 +283,14 @@ class PlayerStorage:
             
             # ✅ ЛОГИРОВАНИЕ ПЕРЕД COMMIT
             logger.info(f"💾 SAVE_USER: user_id={user_id}, total_score={filtered.get('total_score', 'N/A')}, score_balance={filtered.get('score_balance', 'N/A')}")
+            
+            # ✅ ЛОГИРОВАНИЕ player_profile
+            if 'player_profile' in filtered:
+                try:
+                    pp = json.loads(filtered['player_profile'])
+                    logger.info(f"💾 player_profile: attempts_today={pp['secret_room']['attempts_today']}")
+                except:
+                    pass
             
             self.conn.commit()
             return True

@@ -1,7 +1,12 @@
 # handlers/commands.py
 """
 Обработчики команд бота.
-Версия: SQLite + Fix island counter 🗄️✅
+Версия: 3.0 (Adapter Pattern + Multi-platform) 🗄️🔄✅
+
+Изменения:
+- ✅ Использование адаптера платформы вместо прямого Telegram API
+- ✅ user_id нормализуется к str (для совместимости с MAX)
+- ✅ Все сообщения отправляются через adapter.send_message()
 """
 
 import random
@@ -10,23 +15,37 @@ from telegram.ext import ContextTypes
 from core.logger import log_user_action
 from core.ui_helpers import get_persistent_keyboard
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /start — главное меню"""
-    user_id = update.effective_user.id if update.effective_user else 0
+    # ✅ Получаем адаптер платформы
+    adapter = context.bot_data.get('adapter')
+    if not adapter:
+        await update.message.reply_text("⚠️ Ошибка: адаптер платформы не инициализирован.")
+        return
+    
+    # ✅ Нормализуем user_id к строке (для совместимости с MAX)
+    raw_user_id = update.effective_user.id if update.effective_user else 0
+    user_id = adapter.normalize_user_id(raw_user_id)
+    
     first_name = update.effective_user.first_name if update.effective_user else "Путешественник"
     
     log_user_action(user_id, "START", f"name='{first_name}'")
     
     storage = context.bot_data.get('storage')
     if not storage:
-        await update.message.reply_text("⚠️ Ошибка: хранилище данных не инициализировано.")
+        await adapter.send_message(user_id, "⚠️ Ошибка: хранилище данных не инициализировано.")
         return
     
     user_data = storage.get_user(user_id)
     
+    # ✅ FIX: Используем get_or_create_user для новых пользователей
     if not user_data:
-        await update.message.reply_text("❌ Профиль не найден. Попробуйте ещё раз.")
-        return
+        user_data = storage.get_or_create_user(
+            user_id, 
+            update.effective_user.username if update.effective_user else None,
+            first_name
+        )
     
     # Вычисляем уровень
     total_score = user_data.get("total_score", 0)
@@ -79,17 +98,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✅ *Аватарки готовы!*"
         )
     
-    # Клавиатура
+    # Клавиатура (Telegram-специфичная, адаптер сам обработает)
     keyboard = get_persistent_keyboard(user_data, menu="main")
     
-    await update.message.reply_text(
-        welcome_text,
-        parse_mode="Markdown",
-        reply_markup=keyboard
+    # ✅ ОТПРАВКА ЧЕРЕЗ АДАПТЕР
+    await adapter.send_message(
+        user_id=user_id,
+        text=welcome_text,
+        reply_markup=keyboard,
+        parse_mode="Markdown"
     )
+
 
 async def show_bosses_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает гид по боссам"""
+    adapter = context.bot_data.get('adapter')
+    if not adapter:
+        await update.message.reply_text("⚠️ Ошибка: адаптер не инициализирован.")
+        return
+    
+    raw_user_id = update.effective_user.id if update.effective_user else 0
+    user_id = adapter.normalize_user_id(raw_user_id)
+    
     guide_text = (
         "⚔️ *ГИД ПО БОССАМ ЧИСЛЯНДИИ*\n\n"
         "🌑 **Нуль-Пустота** (Остров Сложения)\n"
@@ -105,45 +135,67 @@ async def show_bosses_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "💡 *Совет*: Собери все артефакты перед финальным боем!"
     )
     
-    await update.message.reply_text(guide_text, parse_mode="Markdown")
+    await adapter.send_message(
+        user_id=user_id,
+        text=guide_text,
+        parse_mode="Markdown"
+    )
+
 
 async def restart_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Перезапуск игры (сброс прогресса)"""
-    user_id = update.effective_user.id if update.effective_user else 0
+    adapter = context.bot_data.get('adapter')
+    if not adapter:
+        await update.message.reply_text("⚠️ Ошибка: адаптер не инициализирован.")
+        return
+    
+    raw_user_id = update.effective_user.id if update.effective_user else 0
+    user_id = adapter.normalize_user_id(raw_user_id)
     
     storage = context.bot_data.get('storage')
     if not storage:
-        await update.message.reply_text("⚠️ Ошибка хранилища.")
+        await adapter.send_message(user_id, "⚠️ Ошибка хранилища.")
         return
     
     user_data = storage.get_user(user_id)
     if not user_data:
-        await update.message.reply_text("❌ Профиль не найден.")
+        await adapter.send_message(user_id, "❌ Профиль не найден.")
         return
     
     # Подтверждение
     keyboard = [["✅ Да, сбросить"], ["❌ Отмена"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
-    await update.message.reply_text(
-        "⚠️ *ВНИМАНИЕ!* Это действие необратимо!\n\n"
-        "Весь прогресс будет потерян:\n"
-        "• Очки и уровень\n"
-        "• Пройденные острова\n"
-        "• Побеждённые боссы\n"
-        "• Инвентарь и достижения\n\n"
-        "Вы уверены?",
-        parse_mode="Markdown",
-        reply_markup=reply_markup
+    await adapter.send_message(
+        user_id=user_id,
+        text=(
+            "⚠️ *ВНИМАНИЕ!* Это действие необратимо!\n\n"
+            "Весь прогресс будет потерян:\n"
+            "• Очки и уровень\n"
+            "• Пройденные острова\n"
+            "• Побеждённые боссы\n"
+            "• Инвентарь и достижения\n\n"
+            "Вы уверены?"
+        ),
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
     )
+
 
 async def show_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает последние логи (только для админа)"""
     from config import ADMIN_IDS
     
-    user_id = update.effective_user.id if update.effective_user else 0
-    if user_id not in ADMIN_IDS:
-        await update.message.reply_text("🔒 Только для администратора!")
+    adapter = context.bot_data.get('adapter')
+    if not adapter:
+        await update.message.reply_text("⚠️ Ошибка: адаптер не инициализирован.")
+        return
+    
+    raw_user_id = update.effective_user.id if update.effective_user else 0
+    user_id = adapter.normalize_user_id(raw_user_id)
+    
+    if user_id not in [str(x) for x in ADMIN_IDS]:
+        await adapter.send_message(user_id, "🔒 Только для администратора!")
         return
     
     try:
@@ -155,21 +207,34 @@ async def show_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log_text += "".join(logs)
         log_text += "```"
         
-        await update.message.reply_text(log_text, parse_mode="Markdown")
+        await adapter.send_message(
+            user_id=user_id,
+            text=log_text,
+            parse_mode="Markdown"
+        )
     except FileNotFoundError:
-        await update.message.reply_text("⚠️ Лог-файл не найден!")
+        await adapter.send_message(user_id, "⚠️ Лог-файл не найден!")
     except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка: {e}")
+        await adapter.send_message(user_id, f"❌ Ошибка: {e}")
+
 
 async def health_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Проверка состояния бота"""
     import time
-    from database.storage import PlayerStorage
-    
-    user_id = update.effective_user.id if update.effective_user else 0
+    import os
+    import glob
     from config import ADMIN_IDS
-    if user_id not in ADMIN_IDS:
-        await update.message.reply_text("🔒 Только для администратора!")
+    
+    adapter = context.bot_data.get('adapter')
+    if not adapter:
+        await update.message.reply_text("⚠️ Ошибка: адаптер не инициализирован.")
+        return
+    
+    raw_user_id = update.effective_user.id if update.effective_user else 0
+    user_id = adapter.normalize_user_id(raw_user_id)
+    
+    if user_id not in [str(x) for x in ADMIN_IDS]:
+        await adapter.send_message(user_id, "🔒 Только для администратора!")
         return
     
     status_text = "🏥 *СОСТОЯНИЕ БОТА*:\n\n"
@@ -194,18 +259,20 @@ async def health_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status_text += f"🗄️ *База данных*: ❌ {e}\n"
     
     # ✅ Кэш аватарок
-    import os
-    cache_file = 'data/avatar_cache.json'
+    cache_file = os.path.join('data', 'avatar_cache.json')
     if os.path.exists(cache_file):
         status_text += f"🖼️ *Кэш аватарок*: OK\n"
     else:
         status_text += f"🖼️ *Кэш аватарок*: ⚠️ Не найден\n"
     
     # ✅ Бэкапы
-    import glob
-    backups = glob.glob('data/progress_backup_*.db')
+    backups = glob.glob(os.path.join('data', 'progress_backup_*.db'))
     status_text += f"💾 *Бэкапы*: {len(backups)} файлов\n"
     
     status_text += "\n✅ *Бот работает нормально!*"
     
-    await update.message.reply_text(status_text, parse_mode="Markdown")
+    await adapter.send_message(
+        user_id=user_id,
+        text=status_text,
+        parse_mode="Markdown"
+    )

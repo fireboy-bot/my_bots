@@ -1,11 +1,7 @@
 # handlers/alchemy.py
 """
 Лавка Безумца — алхимические рецепты и рисковые артефакты.
-Версия: 2.1 (Fix balance sync bug) 🗄️⚗️💰🐛
-
-Исправление:
-- После spend_score() обновляем локальный progress["score_balance"]
-- Чтобы финальный save_user() не перезаписал новый баланс старым значением
+Версия: 3.2 (Fix: spend_score is NOT async) 🗄️⚗️🎩✅
 """
 
 import json
@@ -16,9 +12,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from config import BASE_DIR
 from items import SHOP_ITEMS
-from handlers.utils import load_json
+from handlers.narrative_manager import PhraseManager, send_character_message, send_character_message_by_id
 
 logger = logging.getLogger(__name__)
+phrase_manager = PhraseManager()
 
 
 def get_all_items():
@@ -26,7 +23,6 @@ def get_all_items():
     return SHOP_ITEMS
 
 
-# Рецепты алхимии
 ALCHEMY_RECIPES = {
     "bravery_potion": {"cost_in_score": 150, "unlocks_after": "subtraction"},
     "chaos_cup": {"cost_in_score": 250, "unlocks_after": "multiplication"},
@@ -36,9 +32,7 @@ ALCHEMY_RECIPES = {
 
 
 def get_available_recipes(progress):
-    """
-    Возвращает список рецептов, доступных для создания.
-    """
+    """Возвращает список рецептов, доступных для создания."""
     available = []
     unlocked_zones = set(progress.get("unlocked_zones", []))
     completed_normal_game = progress.get("completed_normal_game", False)
@@ -84,13 +78,13 @@ def get_alchemy_inline_keyboard(available_items, current_balance):
         
         keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
     
-    # Кнопка возврата
     keyboard.append([InlineKeyboardButton("⬅️ Назад в игру", callback_data="back_to_game")])
     
     return InlineKeyboardMarkup(keyboard)
 
 
 async def show_alchemy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать алхимию — с аватаркой Алхимика!"""
     user_id = update.effective_user.id if update.effective_user else 0
     
     storage = context.bot_data.get('storage')
@@ -102,12 +96,11 @@ async def show_alchemy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     available_recipes = get_available_recipes(progress)
     
-    # ✅ ИСПРАВЛЕНО: используем score_balance как валюту
     current_balance = progress.get("score_balance", 0)
     total_rating = progress.get("total_score", 0)
     
     msg = "💀 **ЛАВКА БЕЗУМЦА**\n\n"
-    msg += f"💰 Твой баланс: *{current_balance} очков*\n"
+    msg += f"💰 Твой баланс: *{current_balance} золотых*\n"
     msg += f"🏆 Твой рейтинг: *{total_rating} очков*\n\n"
     msg += "ХА-ХА-ХА! Добро пожаловать в мою лабораторию хаоса!\n"
     msg += "Преврати свои очки в безумные артефакты... если осмелишься!\n\n"
@@ -125,7 +118,7 @@ async def show_alchemy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         status = "✅" if can_afford else "❌"
         msg += f"{status} **{item_name}**\n"
-        msg += f"   💰 Цена: {cost_in_score} очков\n"
+        msg += f"   💰 Цена: {cost_in_score} золотых\n"
         msg += f"   ℹ️ {description}\n\n"
     
     if not available_recipes:
@@ -139,46 +132,25 @@ async def show_alchemy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     reply_markup = get_alchemy_inline_keyboard(available_recipes, current_balance)
     
-    # ✅ ИСПРАВЛЕНО: путь через BASE_DIR
-    image_path = os.path.join(BASE_DIR, 'images', 'alchemist_mad.jpg')
+    # ✅ ОТПРАВЛЯЕМ С АВАТАРКОЙ АЛХИМИКА!
+    await send_character_message(
+        update, context, "alchemist",
+        "🧪 *ЛАВКА БЕЗУМЦА!*\n\n«ХА-ХА-ХА! Готов рискнуть?»",
+        mood="calm"
+    )
     
-    try:
-        with open(image_path, 'rb') as photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption=msg,
-                parse_mode="Markdown",
-                reply_markup=reply_markup
-            )
-    except FileNotFoundError:
-        logger.warning(f"🖼️ Аватарка не найдена: {image_path}")
-        await update.message.reply_text(
-            msg,
-            parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
-    except Exception as e:
-        logger.error(f"❌ Ошибка отправки алхимии: {e}")
-        await update.message.reply_text("⚠️ Ошибка загрузки лавки. Попробуй позже.")
+    await update.message.reply_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
 
 
-async def execute_craft(user_id: int, item_id: str, storage, score_manager=None) -> tuple[bool, str]:
-    """
-    Выполняет создание артефакта.
-    
-    Args:
-        user_id: ID пользователя
-        item_id: ID предмета
-        storage: Экземпляр PlayerStorage
-        score_manager: Экземпляр ScoreManager (опционально)
-    
-    Returns:
-        (success: bool, message: str)
-    """
+async def execute_craft(user_id: int, item_id: str, storage, score_manager=None) -> tuple:
+    """Выполняет создание артефакта."""
     progress = storage.get_user(user_id) or {}
     inventory = progress.get("inventory", [])
     
-    # ✅ ИСПРАВЛЕНО: используем score_balance как валюту
     current_balance = progress.get("score_balance", 0)
     
     if item_id not in ALCHEMY_RECIPES:
@@ -195,21 +167,18 @@ async def execute_craft(user_id: int, item_id: str, storage, score_manager=None)
     cost_in_score = item_data.get("cost_in_score")
     item_type = item_data.get("type", "one_time_risk")
     
-    # Проверки
     if current_balance < cost_in_score:
-        return False, f"❌ Недостаточно очков (нужно {cost_in_score}, есть {current_balance})!"
+        return False, f"❌ Недостаточно золотых (нужно {cost_in_score}, есть {current_balance})!"
     
-    # Для one-time предметов: проверяем, не создан ли уже
     if item_type in ["one_time_risk", "level_wide_risk"] and item_id in inventory:
         return False, "❌ Артефакт уже создан!"
     
-    # Проверка доступности по зонам
     if item_id not in get_available_recipes(progress):
         return False, "❌ Рецепт ещё не открыт!"
     
-    # ✅ СПИСАНИЕ ОЧКОВ ЧЕРЕЗ SCORE_MANAGER
+    # ✅ ИСПРАВЛЕНО: spend_score НЕ async — убираем await!
     if score_manager:
-        success, message = await score_manager.spend_score(
+        success, message = score_manager.spend_score(  # ← БЕЗ await!
             user_id=user_id,
             amount=cost_in_score,
             reason="alchemy_craft",
@@ -217,24 +186,19 @@ async def execute_craft(user_id: int, item_id: str, storage, score_manager=None)
         )
         if not success:
             return False, message
-        # ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: обновляем локальный progress после spend_score
-        # Чтобы финальный save_user() не перезаписал новый баланс старым значением
         progress["score_balance"] = max(0, progress.get("score_balance", 0) - cost_in_score)
     else:
-        # Fallback: прямое списание (если score_manager не инициализирован)
         if current_balance < cost_in_score:
-            return False, "❌ Недостаточно очков!"
+            return False, "❌ Недостаточно золотых!"
         progress["score_balance"] = current_balance - cost_in_score
     
-    # Добавляем предмет в инвентарь (только если не был создан)
     if item_id not in inventory:
         inventory.append(item_id)
         progress["inventory"] = inventory
     
-    # ✅ СОХРАНЯЕМ ЧЕРЕЗ PlayerStorage
     storage.save_user(user_id, progress)
     
-    logger.info(f"⚗️ Пользователь {user_id} создал {item_id} за {cost_in_score} очков")
+    logger.info(f"⚗️ Пользователь {user_id} создал {item_id} за {cost_in_score} золотых")
     
     return True, f"✨ Создано: {item_data['name']}!"
 
@@ -271,7 +235,7 @@ def get_alchemy_activation_message(item_id: str) -> str:
             correct_reward = item_data.get("correct_reward", 0)
             cancel_cost = item_data.get("cancel_cost", 0)
             message += f"🌀 *Эффект активирован!* На этом уровне: ошибки = +{error_reward}, правильные = {correct_reward}."
-            message += f"\nОтменить можно за {cancel_cost} очков."
+            message += f"\nОтменить можно за {cancel_cost} золотых."
     
     message += "\n\n💡 Артефакт добавлен в инвентарь!"
     
@@ -279,14 +243,14 @@ def get_alchemy_activation_message(item_id: str) -> str:
 
 
 async def handle_alchemy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик callback'ов алхимии."""
+    """Обработчик callback'ов алхимии — с комментарием Владимира!"""
     query = update.callback_query
     if not query:
         return
     
     await query.answer()
     
-    user_id = update.effective_user.id
+    user_id = str(update.effective_user.id)
     data = query.data
     
     storage = context.bot_data.get('storage')
@@ -296,7 +260,6 @@ async def handle_alchemy_callback(update: Update, context: ContextTypes.DEFAULT_
         await query.edit_message_text("⚠️ Ошибка: хранилище не инициализировано.")
         return
     
-    # Обрабатываем ТОЛЬКО команды алхимии
     if not (data == "back_to_game" or data.startswith("craft_")):
         return
     
@@ -308,7 +271,7 @@ async def handle_alchemy_callback(update: Update, context: ContextTypes.DEFAULT_
         return
     
     if data.startswith("craft_"):
-        item_id = data[6:]  # craft_ = 6 символов
+        item_id = data[6:]
         all_items = get_all_items()
         
         if item_id not in all_items:
@@ -319,20 +282,55 @@ async def handle_alchemy_callback(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text(error_msg)
             return
         
-        success, message = await execute_craft(user_id, item_id, storage, score_manager)
+        success, message = await execute_craft(int(user_id), item_id, storage, score_manager)
         
         if success:
             activation_message = get_alchemy_activation_message(item_id)
-        else:
-            activation_message = message
-        
-        # Универсальное редактирование
-        try:
-            if query.message.photo:
-                await query.edit_message_caption(activation_message, parse_mode="Markdown")
+            
+            # ✅ Владимир комментирует ТОЛЬКО если замок открыт
+            progress = storage.get_user(int(user_id)) or {}
+            if phrase_manager.is_castle_unlocked(progress):
+                # Особые фразы для разных зелий
+                if "madness" in item_id or "chaos" in item_id:
+                    phrase = "«Зелье Безумия?.. Я уже приготовил совок... и смирительную рубашку на ваш размер.»"
+                    mood = "relaxed"
+                elif "bravery" in item_id:
+                    phrase = "«Зелье Смелости?.. Надеюсь, вы знаете что делаете, сударыня.»"
+                    mood = "approve"
+                elif "dice" in item_id or "fate" in item_id:
+                    phrase = "«Кубик Судьбы?.. Азарт — это интересно. Но помните: порядок не любит случайности.»"
+                    mood = "thinking"
+                else:
+                    phrase = phrase_manager.get_vladimir_phrase("purchase_decoration").replace("🎩 ", "", 1)
+                    mood = "approve"
+                
+                # ✅ ИСПОЛЬЗУЕМ send_character_message_by_id ДЛЯ КОЛЛБЭКОВ!
+                await send_character_message_by_id(
+                    user_id=user_id,
+                    character="vladimir",
+                    text=f"{phrase}\n\n{activation_message}",
+                    mood=mood,
+                    context=context
+                )
             else:
-                await query.edit_message_text(activation_message, parse_mode="Markdown")
+                # Просто текст если замок закрыт
+                if query.message.photo:
+                    await query.edit_message_caption(activation_message, parse_mode="Markdown")
+                else:
+                    await query.edit_message_text(activation_message, parse_mode="Markdown")
+        else:
+            # Ошибка
+            error_message = message
+            if query.message.photo:
+                await query.edit_message_caption(error_message, parse_mode="Markdown")
+            else:
+                await query.edit_message_text(error_message, parse_mode="Markdown")
+        
+        try:
+            if not success or not phrase_manager.is_castle_unlocked(storage.get_user(int(user_id)) or {}):
+                if query.message.photo:
+                    await query.edit_message_caption("Готово!", parse_mode="Markdown")
+                else:
+                    await query.edit_message_text("Готово!", parse_mode="Markdown")
         except Exception as e:
             logger.warning(f"⚠️ Не удалось отредактировать сообщение: {e}")
-            # Если редактирование не удалось, отправляем новое сообщение
-            await update.effective_message.reply_text(activation_message, parse_mode="Markdown")

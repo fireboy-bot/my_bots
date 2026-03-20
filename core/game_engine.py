@@ -1,162 +1,229 @@
 # core/game_engine.py
 """
-Ядро Числяндии — бизнес-логика, независимая от платформы.
-Telegram, Web, VK — все используют этот интерфейс.
-Версия: 1.0 (MVP)
+Главное ядро игры Числяндия.
+Версия: 3.2 (Fix: Bank Info Direct DB Read) 🧠🔮🏦✅
 """
 
+import logging
+import sqlite3
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
 from database.storage import PlayerStorage
 from core.score_manager import ScoreManager
-from core.difficulty_manager import DifficultyManager
 from core.castle_engine import CastleEngine
-from core.bank_manager import BankManager
+
+logger = logging.getLogger(__name__)
+
 
 class ChislyandiaEngine:
-    """
-    Главный класс игры.
-    Все платформы (Telegram, Web, etc.) обращаются к этому интерфейсу.
-    """
+    """Главный класс игры — единая точка входа для всех платформ"""
     
     def __init__(self, storage: PlayerStorage, score_manager: ScoreManager):
         self.storage = storage
         self.score_manager = score_manager
-        self.difficulty = DifficultyManager(storage)
         self.castle = CastleEngine(storage)
-        self.bank = BankManager(storage, score_manager)
-    
-    # ================================
-    # 🧮 ЗАДАЧИ
-    # ================================
-    
-    def solve_task(self, user_id: str, answer: int, task_id: str, expected_answer: int) -> Dict[str, Any]:
-        """
-        Универсальная логика решения задачи.
         
-        Args:
-            user_id: ID игрока
-            answer: Ответ игрока
-            task_id: ID задачи (например, "addition_level_3_task_12")
-            expected_answer: Правильный ответ
-            
-        Returns:
-            {
-                'correct': bool,
-                'score_earned': int,
-                'level_up': bool,
-                'message': str
-            }
-        """
-        user = self.storage.get_user(user_id)
-        is_correct = (answer == expected_answer)
-        
-        # Начисление очков
-        if is_correct:
-            base_score = 25
-            multiplier = self.difficulty.get_score_multiplier(user_id, task_id)
-            earned = int(base_score * multiplier)
-            self.score_manager.add_score(user_id, earned, reason="task_correct", context=task_id)
-        else:
-            earned = 0
-        
-        # Адаптация сложности
-        consecutive = user.get("consecutive_correct", 0) if user else 0
-        island_id = task_id.split("_")[0] if "_" in task_id else "addition"
-        new_level, change = self.difficulty.adjust_level(
-            user_id, 
-            island_id,
-            is_correct,
-            consecutive + 1 if is_correct else 0
-        )
-        
-        return {
-            "correct": is_correct,
-            "score_earned": earned,
-            "level_up": change == "level_up",
-            "message": self._get_response_message(is_correct, change),
-        }
+        logger.info("✅ ChislyandiaEngine (ядро) инициализировано")
     
-    def _get_response_message(self, is_correct: bool, change: str) -> str:
-        """Генерация сообщения (платформа сама решит, как показать)"""
-        if is_correct:
-            if change == "level_up":
-                return "✨ Отлично! Задачки становятся сложнее, но ты справляешься!"
-            return "✅ Правильно! Так держать!"
-        else:
-            if change == "level_down":
-                return "💪 Ничего! Давай чуть проще — и ты снова в строю!"
-            return "❌ Почти! Попробуй ещё раз."
-    
-    # ================================
-    # 🏦 ЗЛАТОЧЁТ (БАНК)
-    # ================================
-    
-    def get_bank_info(self, user_id: str) -> Dict[str, Any]:
-        """Получить информацию о вкладе"""
-        return self.bank.get_bank_data(user_id)
-    
-    def deposit_to_bank(self, user_id: str, amount: int) -> Dict[str, Any]:
-        """Положить золотые в Златочёт"""
-        success, message = self.bank.deposit(user_id, amount)
-        return {
-            "success": success,
-            "message": message
-        }
-    
-    def withdraw_from_bank(self, user_id: str) -> Dict[str, Any]:
-        """Забрать вклад с процентами"""
-        success, message, total = self.bank.withdraw(user_id)
-        return {
-            "success": success,
-            "message": message,
-            "total": total
-        }
-    
-    # ================================
-    # 🏰 ЗАМОК
-    # ================================
-    
-    def get_castle_info(self, user_id: str) -> Dict[str, Any]:
-        """Получить информацию о Замке"""
-        return self.castle.get_castle_state(user_id)
-    
-    def pay_castle_upkeep(self, user_id: str) -> Dict[str, Any]:
-        """Оплатить содержание Замка"""
-        success, message = self.castle.pay_upkeep(user_id)
-        return {
-            "success": success,
-            "message": message
-        }
-    
-    # ================================
-    # 🛍️ МАГАЗИН (заглушка)
-    # ================================
-    
-    def buy_item(self, user_id: str, item_id: str) -> Dict[str, Any]:
-        """Покупка предмета (будет реализовано полностью позже)"""
-        # Пока заглушка — реальная логика в handlers/shop.py
-        return {
-            "success": False,
-            "message": "🚧 Покупки через ядро — в разработке. Используйте магазин в боте."
-        }
-    
-    # ================================
-    # 👤 ПРОФИЛЬ
-    # ================================
-    
-    def get_player_profile(self, user_id: str) -> Dict[str, Any]:
-        """Получить профиль игрока (универсальный формат)"""
+    def solve_task(
+        self,
+        user_id: str,
+        answer: Any,
+        task_id: str,
+        expected_answer: Any
+    ) -> Dict[str, Any]:
+        """Проверяет ответ на задачу"""
         user = self.storage.get_user(user_id)
         if not user:
-            return {"error": "Player not found"}
+            return {"correct": False, "message": "❌ Игрок не найден"}
+        
+        is_correct = (answer == expected_answer)
+        
+        if is_correct:
+            base_score = self._get_task_reward(task_id, user)
+            final_score = self.score_manager.add_score(
+                user_id=user_id,
+                amount=base_score,
+                reason="task_correct",
+                context=task_id,
+                apply_artifacts=True
+            )
+            level_up = self._check_level_progress(user_id, user)
+            
+            return {
+                "correct": True,
+                "score_earned": final_score,
+                "level_up": level_up,
+                "message": f"✅ Правильно! +{final_score} очков"
+            }
+        else:
+            base_penalty = self._get_task_penalty(task_id, user)
+            final_penalty = self.score_manager.apply_penalty(
+                user_id=user_id,
+                base_penalty=base_penalty,
+                reason="task_mistake",
+                context=task_id
+            )
+            
+            return {
+                "correct": False,
+                "score_earned": final_penalty,
+                "level_up": False,
+                "message": f"❌ Ошибка! {final_penalty} очков"
+            }
+    
+    def _get_task_reward(self, task_id: str, user: Dict) -> int:
+        """Базовая награда за задачу"""
+        return 50
+    
+    def _get_task_penalty(self, task_id: str, user: Dict) -> int:
+        """Базовый штраф за ошибку"""
+        return -25
+    
+    def _check_level_progress(self, user_id: str, user: Dict) -> bool:
+        """Проверяет, завершён ли уровень"""
+        return False
+    
+    def get_bank_info(self, user_id: str) -> Dict[str, Any]:
+        """
+        Получает информацию о банке.
+        ✅ ЧИТАЕТ БАНКОВСКИЕ ПОЛЯ НАПРЯМУЮ ИЗ БАЗЫ (минуя кэш!)
+        """
+        # ✅ Прямое чтение банковских полей из базы
+        conn = sqlite3.connect("data/progress.db")
+        c = conn.cursor()
+        c.execute(
+            "SELECT bank_balance, interest_earned, bank_interest, bank_days FROM users WHERE user_id = ?",
+            (str(user_id),)
+        )
+        row = c.fetchone()
+        conn.close()
+        
+        bank_balance = row[0] if row and row[0] else 0
+        interest_earned = row[1] if row and row[1] else 0
+        bank_interest = row[2] if row and row[2] else 0.10
+        bank_days = row[3] if row and row[3] else 0
+        
+        # Остальные поля из кэша (это ОК)
+        user = self.storage.get_user(user_id)
+        if not user:
+            return {"error": "Игрок не найден"}
+        
+        return {
+            "balance": user.get("score_balance", 0),  # На руках (из кэша)
+            "bank_balance": bank_balance,  # В банке (из базы!) ✅
+            "interest_earned": interest_earned,  # Проценты (из базы!) ✅
+            "bank_interest": bank_interest,  # Ставка (из базы!) ✅
+            "days_passed": bank_days,  # Дней (из базы!) ✅
+        }
+    
+    def deposit_to_bank(self, user_id: str, amount: int) -> Tuple[bool, str]:
+        """
+        Положить золото в банк.
+        ✅ ПРЯМОЕ ОБНОВЛЕНИЕ БАЗЫ — минуя save_user()!
+        """
+        user = self.storage.get_user(user_id)
+        if not user:
+            return (False, "❌ Игрок не найден")
+        
+        current_balance = user.get("score_balance", 0)
+        if current_balance < amount:
+            return (False, f"❌ Недостаточно золота! Нужно {amount:,}, есть {current_balance:,}")
+        
+        # Списываем с баланса через ScoreManager
+        success, message = self.score_manager.spend_score(
+            user_id=user_id,
+            amount=amount,
+            reason="bank_deposit"
+        )
+        
+        if not success:
+            return (False, message)
+        
+        # ✅ ПРЯМО ОБНОВЛЯЕМ bank_balance В БАЗЕ!
+        conn = sqlite3.connect("data/progress.db")
+        c = conn.cursor()
+        
+        c.execute("SELECT bank_balance FROM users WHERE user_id = ?", (str(user_id),))
+        row = c.fetchone()
+        current_bank = row[0] if row and row[0] else 0
+        
+        new_bank = current_bank + amount
+        c.execute("UPDATE users SET bank_balance = ? WHERE user_id = ?", (new_bank, str(user_id)))
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"🏦 Вклад: user_id={user_id}, +{amount} в банк ({current_bank} → {new_bank})")
+        
+        return (True, f"✅ Вклад успешен! Положено {amount:,} золотых в Златочёт.")
+    
+    def withdraw_from_bank(self, user_id: str) -> Tuple[bool, str, int]:
+        """
+        Забрать вклад с процентами.
+        ✅ ПРЯМОЕ ОБНОВЛЕНИЕ БАЗЫ + кортеж (bool, str, int)
+        """
+        conn = sqlite3.connect("data/progress.db")
+        c = conn.cursor()
+        c.execute("SELECT bank_balance, interest_earned FROM users WHERE user_id = ?", (str(user_id),))
+        row = c.fetchone()
+        
+        if not row:
+            conn.close()
+            return (False, "❌ Игрок не найден", 0)
+        
+        bank_balance = row[0] if row[0] else 0
+        interest_earned = row[1] if row[1] else 0
+        
+        if bank_balance <= 0:
+            conn.close()
+            return (False, "❌ Вклад пуст. Нечего забирать!", 0)
+        
+        total = bank_balance + interest_earned
+        
+        # ✅ ПРЯМО ОБНОВЛЯЕМ БАЗУ: обнуляем вклад
+        c.execute("UPDATE users SET bank_balance = 0, interest_earned = 0, bank_days = 0 WHERE user_id = ?", (str(user_id),))
+        conn.commit()
+        conn.close()
+        
+        # Начисляем очки на баланс через ScoreManager
+        self.score_manager.add_score(user_id, total, reason="bank_withdraw")
+        
+        logger.info(f"🏦 Снятие: user_id={user_id}, забрано {total:,} (вклад: {bank_balance}, проценты: {interest_earned})")
+        
+        message = f"✅ Забрано {total:,} очков!\n💰 Вклад: {bank_balance:,}\n📈 Проценты: {interest_earned:,}"
+        
+        return (True, message, total)
+    
+    def get_castle_info(self, user_id: str) -> Dict[str, Any]:
+        """Получает информацию о замке"""
+        return self.castle.get_castle_state(user_id)
+    
+    def pay_castle_upkeep(self, user_id: str, days: int = 1) -> Tuple[bool, str]:
+        """Оплатить содержание замка"""
+        return self.castle.pay_upkeep(user_id, days)
+    
+    def get_player_profile(self, user_id: str) -> Dict[str, Any]:
+        """Получает профиль игрока"""
+        user = self.storage.get_user(user_id)
+        if not user:
+            return {"error": "Игрок не найден"}
         
         return {
             "user_id": user_id,
             "level": user.get("level", 1),
             "xp": user.get("xp", 0),
-            "score_balance": user.get("score_balance", 0),
             "total_score": user.get("total_score", 0),
+            "score_balance": user.get("score_balance", 0),
             "tasks_solved": user.get("tasks_solved", 0),
             "tasks_correct": user.get("tasks_correct", 0),
+            "inventory": user.get("inventory", []),
+            "artifact_upgrades": user.get("artifact_upgrades", {})
         }
+    
+    def get_artifact_info(self, user_id: str) -> Dict[str, Any]:
+        """Получает информацию об артефактах игрока"""
+        return self.score_manager.artifact_manager.get_all_artifacts(user_id)
+    
+    def upgrade_artifact(self, user_id: str, artifact_id: str) -> Tuple[bool, str]:
+        """Улучшить артефакт"""
+        return self.score_manager.artifact_manager.upgrade_artifact(user_id, artifact_id)

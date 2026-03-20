@@ -1,7 +1,7 @@
 # core/ui_helpers.py
 """
 UI-хелперы для бота «Числяндия».
-Версия: 1.3 (Игровая клавиатура + Банк + Замок) 🎮💡🏦🏰
+Версия: 1.7 (Secret Room Button REMOVED from Main Menu) 🎮💡🏦🏰✅
 """
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
@@ -12,9 +12,12 @@ def get_persistent_keyboard(user_data: dict = None, menu: str = None) -> ReplyKe
     Возвращает постоянное нижнее меню с кнопками.
     
     Args:
-        user_data: Данные пользователя (для проверки прогресса)
+        user_ Данные пользователя (для проверки прогресса)
         menu: Название меню (пока не используется, зарезервировано)
     """
+    
+    # ✅ ЗАЩИТА ОТ NONE (PRO-уровень)
+    user_data = user_data or {}
     
     # Базовые кнопки (всегда видны)
     row1 = [
@@ -27,7 +30,7 @@ def get_persistent_keyboard(user_data: dict = None, menu: str = None) -> ReplyKe
         KeyboardButton("🛒 Магазин"),
     ]
     
-    # ✅ КНОПКИ ЭКОНОМИКИ (всегда видны для Морковки!)
+    # ✅ КНОПКИ ЭКОНОМИКИ (всегда видны)
     row3 = [
         KeyboardButton("🏦 Златочёт"),
         KeyboardButton("🏰 Замок"),

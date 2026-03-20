@@ -1,7 +1,7 @@
 # core/avatar_cache.py
 """
 Кэш аватарок персонажей (file_id).
-Версия: Incremental Save + Heroes Check 🗄️⚡
+Версия: 2.0 (Vladimir Mood Avatars Support) 🗄️⚡🎩
 """
 
 from telegram import Bot
@@ -22,18 +22,37 @@ class AvatarCache:
         self._cache: Dict[str, str] = {}
         self._loading = False
         
+        # ✅ ОБНОВЛЁННЫЙ СПИСОК АВАТАРОК
         self.avatar_paths = {
+            # === ГЕРОИ ===
             "manunya": "images/manunya.jpg",
             "georgy": "images/georgy.jpg",
-            "vladimir": "images/vladimir.jpg",
+            
+            # === ТОРГОВЕЦ И АЛХИМИК ===
+            "shop_keeper": "images/shop_keeper.jpg",
+            "alchemist_mad": "images/alchemist_mad.jpg",
+            
+            # === ВЛАДИМИР (6 настроений) ===
+            "vladimir_calm": "images/vladimir_calm.jpg",
+            "vladimir_approve": "images/vladimir_approve.jpg",
+            "vladimir_disappointed": "images/vladimir_disappointed.jpg",
+            "vladimir_proud": "images/vladimir_proud.jpg",
+            "vladimir_thinking": "images/vladimir_thinking.jpg",
+            "vladimir_relaxed": "images/vladimir_relaxed.jpg",
+            
+            # === БОССЫ ===
             "null_void": "images/null_void.jpg",
             "minus_shadow": "images/minus_shadow.jpg",
             "evil_multiplier": "images/evil_multiplier.jpg",
             "fracosaur": "images/fracosaur.jpg",
             "final_boss": "images/final_boss.jpg",
+            
+            # === ИСТИННЫЙ ВЛАДЫКА (3 фазы) ===
             "true_lord_calm": "images/true_lord_calm.jpg",
             "true_lord_angry": "images/true_lord_angry.jpg",
             "true_lord_desperate": "images/true_lord_desperate.jpg",
+            
+            # === ХРАНИТЕЛИ МИРОВ ===
             "time_keeper": "images/time_keeper.jpg",
             "measure_keeper": "images/measure_keeper.jpg",
             "logic_keeper": "images/logic_keeper.jpg",
@@ -153,9 +172,8 @@ class AvatarCache:
     def is_loading(self) -> bool:
         return self._loading
     
-    # ✅ НОВАЯ ФУНКЦИЯ: ПРОВЕРКА ГЕРОЕВ
     def check_heroes_loaded(self) -> bool:
-        """Проверяет, загружены ли Манюня и Георгий (читает файл напрямую)."""
+        """Проверяет, загружены ли Манюня и Георгий."""
         try:
             if os.path.exists(CACHE_FILE):
                 with open(CACHE_FILE, 'r', encoding='utf-8') as f:

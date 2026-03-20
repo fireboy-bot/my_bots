@@ -1,13 +1,12 @@
-# handlers/bosses.py
 """
 Обработчики боёв с боссами.
-Версия: 2.0 (Score Manager Integration) 🗄️👑💰
+Версия: 2.1 (Vladimir First Meeting Trigger) 🗄️👑🎩
 
 Интеграция:
 - Все начисления очков через score_manager.add_score()
 - Все списания через score_manager.spend_score()
 - Автоматическое логирование в score_log
-- Сохранена вся логика боссов, способностей и эффектов
+- ✅ Триггер первой встречи с Владимиром после победы над Финальным Владыкой
 """
 
 import json
@@ -15,7 +14,7 @@ import os
 import asyncio
 import random
 import re
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from handlers.utils import load_json, send_character_message
 from config import BOSS_DATA_DIR, BOSSES_INFO_FILE
@@ -541,6 +540,13 @@ async def handle_boss_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
             
             # ✅ ОТКРЫВАЕМ ЗОНЫ
             progress = unlock_new_zones(progress, boss_id)
+            
+            # ✅ ТРИГГЕР ПЕРВОЙ ВСТРЕЧИ С ВЛАДИМИРОМ (только для final_boss)
+            if boss_id == "final_boss" and not progress.get("first_vladimir_meeting", False):
+                from handlers.castle import trigger_vladimir_first_meeting
+                await trigger_vladimir_first_meeting(user_id, context, storage)
+                progress["first_vladimir_meeting"] = True
+                storage.save_user(user_id, progress)
         
         storage.save_user(user_id, progress)
         
