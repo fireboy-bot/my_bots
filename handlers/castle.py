@@ -1,11 +1,12 @@
 # handlers/castle.py
 """
 Хендлеры Замка — декорации, upkeep, ВладимИр.
-Версия: 5.7 (Clean + Secret Room Button FIX) 🏰🎩🫖🗝️✅
+Версия: 5.8 (Castle Awakening + Vladimir Mystery) 🏰🎩😈✨✅
 """
 
 import logging
 import json
+import random
 from typing import Dict
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
@@ -121,8 +122,41 @@ async def trigger_vladimir_first_meeting(user_id: str, context, storage):
     logger.info(f"✅ Кат-сцена Владимира завершена для user_id={user_id}")
 
 
+async def _trigger_castle_awakening(update: Update, context: ContextTypes.DEFAULT_TYPE, user_data: dict, adapter):
+    """
+    😈 "Оживание" замка: случайная фраза Владимира (10% шанс).
+    Вызывается из show_castle() если vladimir_appeared=True.
+    """
+    # 10% шанс на фразу при каждом входе в замок
+    if random.random() >= 0.1:
+        return
+    
+    # Фразы Владимира для "оживания" (без имени — интрига!)
+    awakening_phrases = [
+        "«Замок помнит тех, кто видит дальше чисел.»",
+        "«Вы обрели ключ. Но дверь ещё закрыта.»",
+        "«Любопытно… что вы сделаете дальше?»",
+        "«Стены слышали многое. Но не всё скажут.»",
+        "«Вы ближе чем думаете. Но не так близки как кажется.»",
+        "«Порядок — это иллюзия. Понимание — реальность.»",
+    ]
+    
+    phrase = random.choice(awakening_phrases)
+    
+    try:
+        # ✅ ОТПРАВЛЯЕМ БЕЗ ИМЕНИ (???) — игрок сам додумывает
+        await adapter.send_message(
+            user_id=user_id,
+            text=f"🎩 *???:*\n\n{phrase}",
+            parse_mode="Markdown"
+        )
+        logger.info(f"😈 Castle awakening: фраза Владимира для user_id={user_id}")
+    except Exception as e:
+        logger.error(f"❌ Ошибка фразы Владимира в замке: {e}")
+
+
 async def show_castle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показать состояние Замка — с гибридным доступом + Владимир"""
+    """Показать состояние Замка — с гибридным доступом + Владимир + "оживание"""
     adapter = context.bot_data.get('adapter')
     if not adapter:
         await update.message.reply_text("⚠️ Ошибка: адаптер платформы не инициализирован.")
@@ -177,6 +211,11 @@ async def show_castle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # === 👑 ЗАМОК ПОЛНОСТЬЮ ОТКРЫТ (победа над Владыкой) ===
+    
+    # 😈 ПРОВЕРЯЕМ "ОЖИВАНИЕ" ЗАМКА (случайная фраза Владимира)
+    if user_data.get("vladimir_appeared", False):
+        await _trigger_castle_awakening(update, context, user_data, adapter)
+    
     phrase = phrase_manager.get_vladimir_phrase("castle_full")
     logger.info(f"🎩 Отправка сообщения Владимира (full): {phrase[:50]}...")
     await send_character_message(update, context, "vladimir", phrase, mood="calm")
@@ -228,7 +267,6 @@ async def show_castle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += "\n💡 <i>Улучшай декорации для увеличения бонусов!</i>"
     
     # ✅ Клавиатура — КНОПКА "🗝️ Тайная Комната" ОСТАЁТСЯ
-    # Но хендлер для неё НЕ регистрируется здесь — обработка в secret_room.py
     keyboard = ReplyKeyboardMarkup(
         [
             [KeyboardButton("🎨 Декорации"), KeyboardButton("💰 Оплатить upkeep")],

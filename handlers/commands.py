@@ -1,14 +1,15 @@
 # handlers/commands.py
 """
 Обработчики команд бота.
-Версия: 3.0 (Adapter Pattern + Multi-platform) 🗄️🔄✅
+Версия: 3.2 (All Syntax Fixed) 🎬✨✅
 
 Изменения:
-- ✅ Использование адаптера платформы вместо прямого Telegram API
-- ✅ user_id нормализуется к str (для совместимости с MAX)
-- ✅ Все сообщения отправляются через adapter.send_message()
+- ✅ Все type hints исправлены (user_ dict → user_data: dict)
+- ✅ Все .get() вызовы завершены
+- ✅ Кинематографичный вход работает
 """
 
+import asyncio
 import random
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -17,7 +18,8 @@ from core.ui_helpers import get_persistent_keyboard
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /start — главное меню"""
+    """Команда /start — кинематографичный вход в Числяндию"""
+    
     # ✅ Получаем адаптер платформы
     adapter = context.bot_data.get('adapter')
     if not adapter:
@@ -37,15 +39,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await adapter.send_message(user_id, "⚠️ Ошибка: хранилище данных не инициализировано.")
         return
     
-    user_data = storage.get_user(user_id)
-    
-    # ✅ FIX: Используем get_or_create_user для новых пользователей
-    if not user_data:
-        user_data = storage.get_or_create_user(
-            user_id, 
-            update.effective_user.username if update.effective_user else None,
-            first_name
-        )
+    # ✅ Используем get_or_create_user для новых пользователей
+    user_data = storage.get_or_create_user(
+        user_id, 
+        update.effective_user.username if update.effective_user else None,
+        first_name
+    )
     
     # Вычисляем уровень
     total_score = user_data.get("total_score", 0)
@@ -73,41 +72,119 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверяем первый запуск
     is_first_time = user_data.get("first_time", True)
     
-    if is_first_time:
-        welcome_text = (
-            f"🏰 *ДОБРО ПОЖАЛОВАТЬ В ЧИСЛЯНДИЮ*, {first_name}!\n\n"
-            f"Я — Манюня, твоя проводница в мире математики! 🧚‍♀️\n\n"
-            f"Тебя ждут:\n"
-            f"🏝️ 4 волшебных острова\n"
-            f"⚔️ 5 эпических боссов\n"
-            f"🎒 Магазин и Алхимия\n"
-            f"🏰 Личный Замок\n\n"
-            f"Нажми 🗺️ *Мир* чтобы начать приключение!"
-        )
-        user_data["first_time"] = False
-        storage.save_user(user_id, user_data)
-    else:
-        welcome_text = (
-            f"🏰 *С ВОЗВРАЩЕНИЕМ*, {first_name}!\n\n"
-            f"📊 *Твой прогресс*:\n"
-            f"👑 Уровень: {level} ({level_name})\n"
-            f"⭐ Очки: {total_score:,}\n"
-            f"✅ Решено задач: {tasks_solved}\n"
-            f"🏝️ Пройдено островов: {islands_completed}/4\n"
-            f"⚔️ Побеждено боссов: {bosses_defeated}/5\n\n"
-            f"✅ *Аватарки готовы!*"
-        )
-    
-    # Клавиатура (Telegram-специфичная, адаптер сам обработает)
+    # Клавиатура (будет показана в конце)
     keyboard = get_persistent_keyboard(user_data, menu="main")
     
-    # ✅ ОТПРАВКА ЧЕРЕЗ АДАПТЕР
-    await adapter.send_message(
-        user_id=user_id,
-        text=welcome_text,
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
+    if is_first_time:
+        # 🎬 КИНЕМАТОГРАФИЧНЫЙ ВХОД (для новых игроков)
+        
+        # Сообщение 1: Атмосфера
+        await adapter.send_message(
+            user_id=user_id,
+            text="…\n\n*Ты открываешь глаза…*",
+            parse_mode="Markdown"
+        )
+        await asyncio.sleep(1.2)
+        
+        # Сообщение 2: Загадка
+        await adapter.send_message(
+            user_id=user_id,
+            text="*Вокруг — странное место…*\n\n"
+                 "Числа… будто живые.\n"
+                 "Они двигаются.\n"
+                 "Меняются.",
+            parse_mode="Markdown"
+        )
+        await asyncio.sleep(1.2)
+        
+        # Сообщение 3: Знакомство с Манюней
+        await adapter.send_message(
+            user_id=user_id,
+            text="*И вдруг…*\n\n"
+                 "🧚‍♀️ *«О! Ты наконец-то пришёл!»*\n\n"
+                 "Меня зовут Манюня.\n"
+                 "Я ждала тебя.",
+            parse_mode="Markdown"
+        )
+        await asyncio.sleep(1.2)
+        
+        # Сообщение 4: Мир Числяндии
+        await adapter.send_message(
+            user_id=user_id,
+            text="*Здесь — Числяндия.*\n"
+                 "Мир, где числа — это не просто цифры.\n\n"
+                 "Они могут ошибаться.\n"
+                 "И… *ты можешь их исправить.* ✨",
+            parse_mode="Markdown"
+        )
+        await asyncio.sleep(1.2)
+        
+        # Сообщение 5: Возможности
+        await adapter.send_message(
+            user_id=user_id,
+            text="🏝️ *Здесь есть острова.*\n"
+                 "⚔️ *Есть сущности, которые проверяют тебя.*\n"
+                 "🎒 *Есть вещи, которые помогут тебе стать сильнее.*\n\n"
+                 "Но самое важное…",
+            parse_mode="Markdown"
+        )
+        await asyncio.sleep(1.2)
+        
+        # Сообщение 6: Крючок + призыв к действию + клавиатура
+        welcome_final = (
+            f"✨ *Ты не просто игрок.*\n"
+            f"Ты — тот, кто может *понять* этот мир.\n\n"
+            f"Нажми 🗺️ *Мир*.\n"
+            f"Посмотрим, что ты умеешь 🙂"
+        )
+        
+        await adapter.send_message(
+            user_id=user_id,
+            text=welcome_final,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        
+        # ✅ Помечаем что первый вход пройден
+        user_data["first_time"] = False
+        storage.save_user(user_id, user_data)
+        
+        log_user_action(user_id, "START_FIRST_TIME")
+        
+    else:
+        # 🔄 ОБЫЧНЫЙ ВХОД (для вернувшихся игроков)
+        
+        # Персонализированное приветствие
+        if bosses_defeated >= 7:  # Все боссы побеждены
+            greeting = f"👋 *С возвращением, {first_name}!*\n\n"
+            greeting += "🏆 *Легенда Числяндии!*\n"
+            greeting += "Ты освободил мир чисел.\n"
+            greeting += "Что будешь делать сегодня?\n\n"
+            greeting += "🗝️ Тайная комната ждёт новых открытий…"
+        elif bosses_defeated > 0:
+            greeting = f"👋 *С возвращением, {first_name}!*\n\n"
+            greeting += f"📊 Твой уровень: {level} ({level_name})\n"
+            greeting += f"⭐ Очки: {total_score:,}\n"
+            greeting += f"✅ Решено задач: {tasks_solved}\n"
+            greeting += f"🏝️ Пройдено островов: {islands_completed}/4\n"
+            greeting += f"⚔️ Побеждено боссов: {bosses_defeated}/5\n\n"
+            greeting += "Продолжим приключение?"
+        else:
+            greeting = f"👋 *С возвращением, {first_name}!*\n\n"
+            greeting += f"📊 Твой уровень: {level} ({level_name})\n"
+            greeting += "🗺️ *Мир* ждёт тебя.\n"
+            greeting += "🎒 *Инвентарь* хранит твои находки.\n"
+            greeting += "🏰 *Замок* — твоя крепость.\n\n"
+            greeting += "С чего начнём?"
+        
+        await adapter.send_message(
+            user_id=user_id,
+            text=greeting,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        
+        log_user_action(user_id, "START_RETURNING")
 
 
 async def show_bosses_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):

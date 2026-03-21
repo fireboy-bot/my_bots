@@ -2,7 +2,7 @@
 """
 Тайная Комната — пост-гейм модуль с исследованием, загадками и наградами.
 Архитектура: handler → storage (без services/)
-Версия: 1.10 (Final DB Sync Fix) 🗝️📅💾✅
+Версия: 1.11 (Content Loading Fix) 🗝️📚✅
 """
 
 import random
@@ -22,57 +22,47 @@ logger = logging.getLogger(__name__)
 SECRET_ROOM_MAX_ATTEMPTS = 3
 
 
-# === 🧩 БАЗА ЗАГАДОК ===
-PUZZLES = [
-    {
-        "id": "p1",
-        "question": "Сколько будет 7 × 8?",
-        "options": ["54", "56", "64"],
-        "correct": 1,
-        "reward_points": 20,
-        "reward_item": None,
-        "explanation": "7 × 8 = 56. Таблица умножения — основа Числяндии!"
-    },
-    {
-        "id": "p2",
-        "question": "Какое число следующее: 2, 4, 8, 16, ...?",
-        "options": ["24", "32", "20"],
-        "correct": 1,
-        "reward_points": 20,
-        "reward_item": None,
-        "explanation": "Каждое число умножается на 2: 16 × 2 = 32!"
-    },
-    {
-        "id": "p3",
-        "question": "Сколько углов у треугольника?",
-        "options": ["2", "3", "4"],
-        "correct": 1,
-        "reward_points": 10,
-        "reward_item": "ancient_coin",
-        "explanation": "Треугольник имеет 3 угла и 3 стороны. Древняя монета — твой трофей!"
-    },
-    {
-        "id": "p4",
-        "question": "Что больше: половина от 100 или четверть от 200?",
-        "options": ["Половина от 100", "Четверть от 200", "Одинаково"],
-        "correct": 2,
-        "reward_points": 20,
-        "reward_item": None,
-        "explanation": "Половина от 100 = 50, четверть от 200 = 50. Они равны!"
-    },
-    {
-        "id": "p5",
-        "question": "Сколько будет 100 − 37?",
-        "options": ["63", "73", "53"],
-        "correct": 0,
-        "reward_points": 15,
-        "reward_item": None,
-        "explanation": "100 − 37 = 63. Отличная работа с вычитанием!"
-    }
-]
+# === 🧩 ЗАГРУЗКА ЗАДАЧ ИЗ ФАЙЛА ===
+
+def _load_tasks_from_file() -> List[dict]:
+    """Загружает задачи из файла."""
+    tasks_file = os.path.join("data", "secret_room_tasks.json")
+    if not os.path.exists(tasks_file):
+        # Возвращаем заглушку если файла нет
+        return [
+            {"id": "p1", "question": "Сколько будет 7 × 8?", "options": ["54", "56", "64"], "correct": 1, "reward_points": 20, "reward_item": None, "explanation": "7 × 8 = 56"},
+            {"id": "p2", "question": "Какое число следующее: 2, 4, 8, 16, ...?", "options": ["24", "32", "20"], "correct": 1, "reward_points": 20, "reward_item": None, "explanation": "×2"},
+            {"id": "p3", "question": "Сколько углов у треугольника?", "options": ["2", "3", "4"], "correct": 1, "reward_points": 10, "reward_item": "ancient_coin", "explanation": "3 угла"},
+            {"id": "p4", "question": "Что больше: половина от 100 или четверть от 200?", "options": ["Половина", "Четверть", "Одинаково"], "correct": 2, "reward_points": 20, "reward_item": None, "explanation": "50=50"},
+            {"id": "p5", "question": "Сколько будет 100 − 37?", "options": ["63", "73", "53"], "correct": 0, "reward_points": 15, "reward_item": None, "explanation": "100-37=63"},
+        ]
+    
+    try:
+        with open(tasks_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            all_tasks = []
+            for category in data.values():
+                for task in category:
+                    all_tasks.append({
+                        "id": f"t{len(all_tasks)+1}",
+                        "question": task["question"],
+                        "options": [str(o) for o in task["options"]],
+                        "correct": task["correct"],
+                        "reward_points": task.get("reward", 10),
+                        "reward_item": None,
+                        "explanation": task.get("explanation", "")
+                    })
+            logger.info(f"✅ Загружено {len(all_tasks)} задач из {tasks_file}")
+            return all_tasks
+    except Exception as e:
+        logger.error(f"❌ Ошибка загрузки задач: {e}")
+        return []
+
+# Загружаем задачи при старте модуля
+PUZZLES = _load_tasks_from_file()
 
 
-# === 📜 БАЗА ЛОРА ===
+# === 📜 БАЗА ЛОРА (заглушка — загрузится из файла) ===
 LORE_ENTRIES = [
     "📜 Дневник Архитектора, день 1:\n«Сегодня я заложил первый камень Числяндии. Пусть числа ведут тех, кто ищет истину.»",
     "📜 Запись в древнем фолианте:\n«Тот, кто постигнет сложение, откроет врата. Тот, кто освоит умножение — обретёт силу.»",
