@@ -6,6 +6,12 @@ import re
 # НЕ храните секреты в коде. Установите BOT_TOKEN в системных переменных
 # или в файле .env (не добавляйте .env в репозиторий).
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+IS_PRODUCTION = APP_ENV in {"prod", "production"}
+BACKUP_KEEP_COUNT = int(os.getenv("BACKUP_KEEP_COUNT", "14"))
+SPAM_MIN_INTERVAL_SEC = float(os.getenv("SPAM_MIN_INTERVAL_SEC", "0.45"))
+SPAM_DUPLICATE_WINDOW_SEC = float(os.getenv("SPAM_DUPLICATE_WINDOW_SEC", "3.0"))
+SPAM_WARN_INTERVAL_SEC = float(os.getenv("SPAM_WARN_INTERVAL_SEC", "4.0"))
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TASKS_FILE = os.path.join(BASE_DIR, "data", "tasks.json")        # ← ДОБАВЛЕНО

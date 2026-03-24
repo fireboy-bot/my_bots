@@ -1,12 +1,14 @@
 # Переменные окружения
 .env
 .env.local
+.env.max
 
 # Базы данных и кэш
 *.db
 *.sqlite
 *.sqlite3
 data/avatar_cache.json
+data/progress.db
 
 # Логи
 logs/
@@ -32,3 +34,11 @@ images/
 # Системные файлы
 .DS_Store
 Thumbs.db
+
+# Добавь в конец:
+venv/
+__pycache__/
+*.pyc
+data/*.db
+data/*.json
+images/

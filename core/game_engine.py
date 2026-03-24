@@ -83,6 +83,89 @@ class ChislyandiaEngine:
     def _check_level_progress(self, user_id: str, user: Dict) -> bool:
         """Проверяет, завершён ли уровень"""
         return False
+
+    def _ensure_bank_columns(self, conn: sqlite3.Connection):
+        """Гарантирует наличие банковских колонок в users."""
+        c = conn.cursor()
+        c.execute("PRAGMA table_info(users)")
+        cols = {row[1] for row in c.fetchall()}
+
+        migrations = [
+            ("bank_balance", "INTEGER DEFAULT 0"),
+            ("interest_earned", "INTEGER DEFAULT 0"),
+            ("bank_interest", "REAL DEFAULT 0.10"),
+            ("bank_days", "INTEGER DEFAULT 0"),
+            ("bank_last_interest_at", "TEXT"),
+        ]
+        for name, ddl in migrations:
+            if name not in cols:
+                c.execute(f"ALTER TABLE users ADD COLUMN {name} {ddl}")
+        conn.commit()
+
+    def _apply_bank_interest(self, conn: sqlite3.Connection, user_id: str):
+        """
+        Начисляет проценты за полные прошедшие дни с момента последнего начисления.
+        Вызывается при просмотре банка/вкладе/снятии.
+        """
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT bank_balance, interest_earned, bank_interest, bank_days, bank_last_interest_at
+            FROM users WHERE user_id = ?
+            """,
+            (str(user_id),)
+        )
+        row = c.fetchone()
+        if not row:
+            return
+
+        bank_balance = row[0] or 0
+        interest_earned = row[1] or 0
+        bank_interest = row[2] if row[2] is not None else 0.10
+        bank_days = row[3] or 0
+        last_interest_at = row[4]
+
+        if bank_balance <= 0:
+            # Если вклада нет — просто фиксируем точку отсчёта.
+            if not last_interest_at:
+                c.execute(
+                    "UPDATE users SET bank_last_interest_at = ? WHERE user_id = ?",
+                    (datetime.now(timezone.utc).isoformat(), str(user_id))
+                )
+                conn.commit()
+            return
+
+        now = datetime.now(timezone.utc)
+        if not last_interest_at:
+            c.execute(
+                "UPDATE users SET bank_last_interest_at = ? WHERE user_id = ?",
+                (now.isoformat(), str(user_id))
+            )
+            conn.commit()
+            return
+
+        try:
+            last_dt = datetime.fromisoformat(last_interest_at)
+        except Exception:
+            last_dt = now
+
+        full_days = int((now - last_dt).total_seconds() // 86400)
+        if full_days <= 0:
+            return
+
+        add_interest = int(bank_balance * bank_interest * full_days)
+        new_interest = interest_earned + add_interest
+        new_days = bank_days + full_days
+
+        c.execute(
+            """
+            UPDATE users
+            SET interest_earned = ?, bank_days = ?, bank_last_interest_at = ?
+            WHERE user_id = ?
+            """,
+            (new_interest, new_days, now.isoformat(), str(user_id))
+        )
+        conn.commit()
     
     def get_bank_info(self, user_id: str) -> Dict[str, Any]:
         """
@@ -92,6 +175,8 @@ class ChislyandiaEngine:
         # ✅ Прямое чтение банковских полей из базы
         conn = sqlite3.connect("data/progress.db")
         c = conn.cursor()
+        self._ensure_bank_columns(conn)
+        self._apply_bank_interest(conn, user_id)
         c.execute(
             "SELECT bank_balance, interest_earned, bank_interest, bank_days FROM users WHERE user_id = ?",
             (str(user_id),)
@@ -143,13 +228,22 @@ class ChislyandiaEngine:
         # ✅ ПРЯМО ОБНОВЛЯЕМ bank_balance В БАЗЕ!
         conn = sqlite3.connect("data/progress.db")
         c = conn.cursor()
+        self._ensure_bank_columns(conn)
+        self._apply_bank_interest(conn, user_id)
         
         c.execute("SELECT bank_balance FROM users WHERE user_id = ?", (str(user_id),))
         row = c.fetchone()
         current_bank = row[0] if row and row[0] else 0
         
         new_bank = current_bank + amount
-        c.execute("UPDATE users SET bank_balance = ? WHERE user_id = ?", (new_bank, str(user_id)))
+        c.execute(
+            """
+            UPDATE users
+            SET bank_balance = ?, bank_last_interest_at = ?
+            WHERE user_id = ?
+            """,
+            (new_bank, datetime.now(timezone.utc).isoformat(), str(user_id))
+        )
         conn.commit()
         conn.close()
         
@@ -164,6 +258,8 @@ class ChislyandiaEngine:
         """
         conn = sqlite3.connect("data/progress.db")
         c = conn.cursor()
+        self._ensure_bank_columns(conn)
+        self._apply_bank_interest(conn, user_id)
         c.execute("SELECT bank_balance, interest_earned FROM users WHERE user_id = ?", (str(user_id),))
         row = c.fetchone()
         
@@ -181,7 +277,14 @@ class ChislyandiaEngine:
         total = bank_balance + interest_earned
         
         # ✅ ПРЯМО ОБНОВЛЯЕМ БАЗУ: обнуляем вклад
-        c.execute("UPDATE users SET bank_balance = 0, interest_earned = 0, bank_days = 0 WHERE user_id = ?", (str(user_id),))
+        c.execute(
+            """
+            UPDATE users
+            SET bank_balance = 0, interest_earned = 0, bank_days = 0, bank_last_interest_at = ?
+            WHERE user_id = ?
+            """,
+            (datetime.now(timezone.utc).isoformat(), str(user_id))
+        )
         conn.commit()
         conn.close()
         

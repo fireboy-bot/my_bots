@@ -1,17 +1,31 @@
 # handlers/message_router.py
 """
 Обработчик всех входящих сообщений.
-Версия: 3.3 (Flexible Button Matching + Debug Logging) 🎮✅
+Версия: 3.5 (Fix: Remove duplicate get_user + Debug new users) 🎮✅
 """
 
 import asyncio
 import logging
+import time
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from handlers.utils import send_character_message
 from core.logger import log_user_action, log_error
+from config import (
+    SPAM_MIN_INTERVAL_SEC as CFG_SPAM_MIN_INTERVAL_SEC,
+    SPAM_DUPLICATE_WINDOW_SEC as CFG_SPAM_DUPLICATE_WINDOW_SEC,
+    SPAM_WARN_INTERVAL_SEC as CFG_SPAM_WARN_INTERVAL_SEC,
+)
 
 logger = logging.getLogger(__name__)
+
+# === АНТИСПАМ НАСТРОЙКИ ===
+# Минимальный интервал между сообщениями от одного пользователя.
+MIN_MESSAGE_INTERVAL_SEC = CFG_SPAM_MIN_INTERVAL_SEC
+# Окно, в котором одинаковый текст считается дубликатом.
+DUPLICATE_WINDOW_SEC = CFG_SPAM_DUPLICATE_WINDOW_SEC
+# Минимальный интервал между предупреждениями о спаме.
+SPAM_WARN_INTERVAL_SEC = CFG_SPAM_WARN_INTERVAL_SEC
 
 
 def _normalize_text(text: str) -> str:
@@ -31,7 +45,7 @@ def _normalize_text(text: str) -> str:
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Обрабатывает все входящие сообщения.
-    ✅ ГИБКОЕ СРАВНЕНИЕ КНОПОК + ДЕБАГ-ЛОГИ
+    ✅ ГИБКОЕ СРАВНЕНИЕ КНОПОК + ДЕБАГ-ЛОГИ + ФИКС ПРИОРИТЕТА ОТВЕТОВ
     """
     try:
         if not update.message or not update.message.text:
@@ -45,7 +59,38 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         logger.debug(f"📨 Получено: raw='{raw_text}' | normalized='{text}' | user={first_name}")
         
-        log_user_action(user_id, "MESSAGE", f"text='{raw_text}' | name='{first_name}'")
+        log_user_action(user_id, "MESSAGE", f"text_len={len(raw_text)}")
+
+        # === ✅ АНТИСПАМ: защита от флуда и дубликатов ===
+        now = time.monotonic()
+        anti_spam = context.bot_data.setdefault("_anti_spam", {})
+        state = anti_spam.get(user_id, {
+            "last_ts": 0.0,
+            "last_text": "",
+            "last_warn_ts": 0.0,
+        })
+
+        is_too_fast = (now - state["last_ts"]) < MIN_MESSAGE_INTERVAL_SEC
+        is_duplicate = (
+            text
+            and text == state["last_text"]
+            and (now - state["last_ts"]) < DUPLICATE_WINDOW_SEC
+        )
+
+        if is_too_fast or is_duplicate:
+            # Обновляем таймстамп, чтобы удерживать флудера в окне.
+            state["last_ts"] = now
+            anti_spam[user_id] = state
+
+            if (now - state["last_warn_ts"]) >= SPAM_WARN_INTERVAL_SEC:
+                state["last_warn_ts"] = now
+                anti_spam[user_id] = state
+                await update.message.reply_text("⏳ Чуть медленнее, пожалуйста.")
+            return True
+
+        state["last_ts"] = now
+        state["last_text"] = text
+        anti_spam[user_id] = state
         
         # === ✅ ЭКСТРЕННЫЙ ВЫХОД: ГИБКОЕ СРАВНЕНИЕ ===
         exit_keywords = ["назад", "выйти", "выход", "меню", "back", "exit", "⬅️"]
@@ -83,24 +128,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ Ошибка: хранилище данных не инициализировано.")
             return False
         
+        # ✅ ЗАГРУЖАЕМ ДАННЫЕ ПОЛЬЗОВАТЕЛЯ ОДИН РАЗ В НАЧАЛЕ
         user_data = storage.get_user(user_id) or {}
         
-        # === ОБРАБОТКА БОЯ ===
+        # === 🔥 ПРИОРИТЕТ 1: ОБРАБОТКА БОЯ (если в бою — только ответы) ===
         if user_data.get("in_boss_battle"):
             logger.debug(f"⚔️ В бою: обрабатываем через handle_boss_answer")
             from handlers.bosses import handle_boss_answer
             boss_handled = await handle_boss_answer(update, context)
-            return boss_handled
+            if boss_handled:
+                return True
+            # Если False — продолжаем (на случай ошибки в обработчике)
+            logger.warning(f"⚠️ handle_boss_answer вернул False для user_id={user_id}")
 
-        # === ОБРАБОТКА УРОВНЯ ===
+        # === 🔥 ПРИОРИТЕТ 2: ОБРАБОТКА УРОВНЯ (если в уровне — только ответы) ===
+        # ✅ ФИКС: убрали дублирующий storage.get_user() — используем user_data из начала функции
+        # ✅ ФИКС: добавили дебаг-лог для отладки новых пользователей
         if user_data.get("current_level"):
-            logger.debug(f"🎮 В уровне: обрабатываем через handle_level_answer")
+            logger.debug(f"🎮 Level check: current_level='{user_data['current_level']}', user_id={user_id}, keys={list(user_data.keys())[:8]}")
             from handlers.levels import handle_level_answer
             level_handled = await handle_level_answer(update, context)
-            return level_handled
+            if level_handled:
+                return True
+            # Если False — продолжаем
+            logger.warning(f"⚠️ handle_level_answer вернул False для user_id={user_id}")
+        else:
+            # 🔥 DEBUG: если не в уровне, но пользователь только что вошёл — логируем состояние
+            logger.debug(f"🔍 DEBUG: NOT in level. current_level={user_data.get('current_level')}, in_boss={user_data.get('in_boss_battle')}, unlocked={user_data.get('unlocked_zones')}")
 
-        # === ✅ УРОВЕНЬ 1: КНОПКА «ИГРАТЬ» ===
-        # ГИБКОЕ СРАВНЕНИЕ: ищем "играть" в тексте
+        # === 🔥 ПРИОРИТЕТ 2.5: ОБРАБОТКА ТАЙНОЙ КОМНАТЫ ===
+        if user_data.get("in_secret_level"):
+            logger.debug(f"🔐 В тайной комнате: обрабатываем ответ")
+            from handlers.secret_room import handle_secret_answer
+            secret_handled = await handle_secret_answer(update, context)
+            if secret_handled:
+                return True
+            logger.warning(f"⚠️ handle_secret_answer вернул False для user_id={user_id}")
+
+        # === ✅ ОБРАБОТКА КОМАНД МЕНЮ (только если НЕ в игре) ===
+        
+        # 🎮 Играть
         if "играть" in text or "начать" in text or text in ["игра", "🎮"]:
             logger.info(f"🎮 Запуск игры: user_id={user_id}")
             keyboard = ReplyKeyboardMarkup([
@@ -118,9 +185,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return True
 
-        # === ✅ УРОВЕНЬ 2: КНОПКИ ИЗ МЕНЮ «ИГРАТЬ» ===
-        
-        # 🏝️ ОСТРОВА
+        # 🏝️ Острова
         if "остров" in text or text in ["🏝️"]:
             logger.info(f"🏝️ Выбор острова: user_id={user_id}")
             keyboard = ReplyKeyboardMarkup([
@@ -140,7 +205,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return True
 
-        # ⚔️ БОССЫ
+        # ⚔️ Боссы
         if "босс" in text or text in ["⚔️", "бой"]:
             logger.info(f"⚔️ Выбор босса: user_id={user_id}")
             keyboard = ReplyKeyboardMarkup([
@@ -161,7 +226,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return True
 
-        # 🗺️ МИРЫ
+        # 🗺️ Миры
         if "мир" in text or text in ["🗺️"]:
             logger.info(f"🗺️ Выбор мира: user_id={user_id}")
             keyboard = ReplyKeyboardMarkup([
@@ -179,69 +244,69 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return True
 
-        # === ✅ УРОВЕНЬ 3: ЗАПУСК УРОВНЕЙ (ОСТРОВА) ===
-        
-        if "слож" in text or "addition" in text:
-            logger.info(f"➕ Запуск уровня: addition, user_id={user_id}")
-            from handlers.levels import enter_level
-            await enter_level(update, context, "addition")
-            log_user_action(user_id, "ENTER_LEVEL", "level=addition")
-            return True
-
-        if "вычит" in text or "subtraction" in text:
-            logger.info(f"➖ Запуск уровня: subtraction, user_id={user_id}")
-            from handlers.levels import enter_level
-            await enter_level(update, context, "subtraction")
-            log_user_action(user_id, "ENTER_LEVEL", "level=subtraction")
-            return True
-
-        if "умнож" in text or "multiplication" in text:
-            logger.info(f"✖️ Запуск уровня: multiplication, user_id={user_id}")
-            from handlers.levels import enter_level
-            await enter_level(update, context, "multiplication")
-            log_user_action(user_id, "ENTER_LEVEL", "level=multiplication")
-            return True
-
-        if "делен" in text or "division" in text:
-            logger.info(f"➗ Запуск уровня: division, user_id={user_id}")
-            from handlers.levels import enter_level
-            await enter_level(update, context, "division")
-            log_user_action(user_id, "ENTER_LEVEL", "level=division")
-            return True
-
-        # === ✅ УРОВЕНЬ 3: ЗАПУСК БОССОВ ===
-        
-        boss_map = {
-            "нуль": "null_void", "пустот": "null_void",
-            "минус": "minus_shadow", "тен": "minus_shadow",
-            "умножител": "evil_multiplier", "злой": "evil_multiplier",
-            "дробозавр": "fracosaur", "дроб": "fracosaur",
-            "владык": "final_boss", "финальн": "final_boss",
-        }
-        
-        for keyword, boss_id in boss_map.items():
-            if keyword in text:
-                logger.info(f"👑 Запуск босса: {boss_id}, user_id={user_id}")
-                from handlers.bosses import start_boss_battle
-                await start_boss_battle(update, context, boss_id)
-                log_user_action(user_id, "START_BOSS", f"boss={boss_id}")
-                return True
-
-        # === ✅ УРОВЕНЬ 3: ЗАПУСК МИРОВ ===
-        
-        world_map = {
-            "хроноп": "time_world", "врем": "time_world",
-            "мер": "measure_world", "измер": "measure_world",
-            "логик": "logic_world", "разум": "logic_world",
-        }
-        
-        for keyword, world_id in world_map.items():
-            if keyword in text:
-                logger.info(f"🌍 Запуск мира: {world_id}, user_id={user_id}")
+        # === ✅ ЗАПУСК УРОВНЕЙ (ОСТРОВА) — ТОЛЬКО ЕСЛИ НЕ В УРОВНЕ ===
+        if not user_data.get("current_level"):
+            if "слож" in text or "addition" in text:
+                logger.info(f"➕ Запуск уровня: addition, user_id={user_id}")
                 from handlers.levels import enter_level
-                await enter_level(update, context, world_id)
-                log_user_action(user_id, "ENTER_LEVEL", f"level={world_id}")
+                await enter_level(update, context, "addition")
+                log_user_action(user_id, "ENTER_LEVEL", "level=addition")
                 return True
+
+            if "вычит" in text or "subtraction" in text:
+                logger.info(f"➖ Запуск уровня: subtraction, user_id={user_id}")
+                from handlers.levels import enter_level
+                await enter_level(update, context, "subtraction")
+                log_user_action(user_id, "ENTER_LEVEL", "level=subtraction")
+                return True
+
+            if "умнож" in text or "multiplication" in text:
+                logger.info(f"✖️ Запуск уровня: multiplication, user_id={user_id}")
+                from handlers.levels import enter_level
+                await enter_level(update, context, "multiplication")
+                log_user_action(user_id, "ENTER_LEVEL", "level=multiplication")
+                return True
+
+            if "делен" in text or "division" in text:
+                logger.info(f"➗ Запуск уровня: division, user_id={user_id}")
+                from handlers.levels import enter_level
+                await enter_level(update, context, "division")
+                log_user_action(user_id, "ENTER_LEVEL", "level=division")
+                return True
+
+        # === ✅ ЗАПУСК БОССОВ — ТОЛЬКО ЕСЛИ НЕ В БОЮ ===
+        if not user_data.get("in_boss_battle"):
+            boss_map = {
+                "нуль": "null_void", "пустот": "null_void",
+                "минус": "minus_shadow", "тен": "minus_shadow",
+                "умножител": "evil_multiplier", "злой": "evil_multiplier",
+                "дробозавр": "fracosaur", "дроб": "fracosaur",
+                "владык": "final_boss", "финальн": "final_boss",
+            }
+            
+            for keyword, boss_id in boss_map.items():
+                if keyword in text:
+                    logger.info(f"👑 Запуск босса: {boss_id}, user_id={user_id}")
+                    from handlers.bosses import start_boss_battle
+                    await start_boss_battle(update, context, boss_id)
+                    log_user_action(user_id, "START_BOSS", f"boss={boss_id}")
+                    return True
+
+        # === ✅ ЗАПУСК МИРОВ — ТОЛЬКО ЕСЛИ НЕ В УРОВНЕ ===
+        if not user_data.get("current_level"):
+            world_map = {
+                "хроноп": "time_world", "врем": "time_world",
+                "мер": "measure_world", "измер": "measure_world",
+                "логик": "logic_world", "разум": "logic_world",
+            }
+            
+            for keyword, world_id in world_map.items():
+                if keyword in text:
+                    logger.info(f"🌍 Запуск мира: {world_id}, user_id={user_id}")
+                    from handlers.levels import enter_level
+                    await enter_level(update, context, world_id)
+                    log_user_action(user_id, "ENTER_LEVEL", f"level={world_id}")
+                    return True
 
         # === ✅ ОБРАБОТКА КНОПОК БАНКА (ЗЛАТОЧЁТ) ===
         if "златочёт" in text or "банк" in text or "🏦" in raw_text:
@@ -250,27 +315,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_bank(update, context)
             return True
         
-        if "положить 100" in text or "100" in text and "полож" in text:
+        if "положить 100" in text or ("100" in text and "полож" in text):
             from handlers.bank import bank_deposit_100
             await bank_deposit_100(update, context)
             return True
         
-        if "положить 500" in text or "500" in text and "полож" in text:
+        if "положить 500" in text or ("500" in text and "полож" in text):
             from handlers.bank import bank_deposit_500
             await bank_deposit_500(update, context)
             return True
         
-        if "положить 1000" in text or "1000" in text and "полож" in text:
+        if "положить 1000" in text or ("1000" in text and "полож" in text):
             from handlers.bank import bank_deposit_1000
             await bank_deposit_1000(update, context)
             return True
         
-        if "другая сумма" in text or "сумма" in text and "полож" in text:
+        if "другая сумма" in text or ("сумма" in text and "полож" in text):
             from handlers.bank import bank_deposit_custom
             await bank_deposit_custom(update, context)
             return True
         
-        if "забрать" in text and "всё" in text or "забрать вклад" in text:
+        if ("забрать" in text and "всё" in text) or "забрать вклад" in text:
             from handlers.bank import bank_withdraw_all
             await bank_withdraw_all(update, context)
             return True
@@ -371,7 +436,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         
         for keyword, level_id in island_keywords.items():
-            if keyword in text:
+            if keyword in text and not user_data.get("current_level"):
                 logger.info(f"🏝️ Запуск уровня по ключевому слову: {level_id}, user_id={user_id}")
                 from handlers.levels import enter_level
                 await enter_level(update, context, level_id)
@@ -388,24 +453,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         
         for keyword, boss_id in boss_keywords.items():
-            if keyword in text:
+            if keyword in text and not user_data.get("in_boss_battle"):
                 logger.info(f"⚔️ Запуск босса по ключевому слову: {boss_id}, user_id={user_id}")
                 from handlers.bosses import start_boss_battle
                 await start_boss_battle(update, context, boss_id)
                 log_user_action(user_id, "START_BOSS", f"boss={boss_id}")
                 return True
         
-        # ❌ Неизвестная команда — показываем подсказку
+        # === ❌ НЕИЗВЕСТНАЯ КОМАНДА ===
         logger.warning(f"❓ Не распознана команда: '{raw_text}' от user_id={user_id}")
-        await update.message.reply_text(
-            "💡 <b>Не понимаю эту команду.</b>\n\n"
-            "Выбери действие из меню или напиши:\n"
-            "• 🎮 Играть — начать игру\n"
-            "• 🏰 Замок — твой замок с Владимиром\n"
-            "• 🏦 Златочёт — банк с процентами\n"
-            "• ⬅️ Назад — выйти из уровня/боя",
-            parse_mode="HTML"
-        )
+        
+        # 🔥 ПОДСКАЗКА: если похоже на число — возможно это ответ на задачу
+        if raw_text.lstrip('-').isdigit() or (raw_text.replace('.', '', 1).lstrip('-').isdigit() and raw_text.count('.') <= 1):
+            await update.message.reply_text(
+                "🤔 Это похоже на ответ на задачу!\n\n"
+                "Если ты в уровне — проверь что уровень активен.\n"
+                "Если нет — нажми 🎮 Играть → 🏝️ Острова → ➕ Сложение",
+                parse_mode="HTML"
+            )
+        else:
+            await update.message.reply_text(
+                "💡 <b>Не понимаю эту команду.</b>\n\n"
+                "Выбери действие из меню или напиши:\n"
+                "• 🎮 Играть — начать игру\n"
+                "• 🏰 Замок — твой замок с Владимиром\n"
+                "• 🏦 Златочёт — банк с процентами\n"
+                "• ⬅️ Назад — выйти из уровня/боя",
+                parse_mode="HTML"
+            )
         return False
     
     except Exception as e:

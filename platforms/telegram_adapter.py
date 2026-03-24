@@ -3,7 +3,7 @@
 Адаптер Telegram для бота «Числяндия».
 Оборачивает Telegram Bot API в универсальный интерфейс MessageAdapter.
 
-Версия: 1.0 (MVP) 🤖
+Версия: 1.1 (Fix: parse_callback_data + isdigit safety) 🤖✅
 """
 import logging
 from typing import Optional, Dict, Any
@@ -61,8 +61,9 @@ class TelegramAdapter(MessageAdapter):
             bool: True если отправлено успешно
         """
         try:
-            # Telegram принимает chat_id как int или str
-            chat_id = int(user_id) if user_id.isdigit() else user_id
+            # 🔥 БЕЗОПАСНО: конвертируем в строку перед isdigit()
+            user_id_str = str(user_id)
+            chat_id = int(user_id_str) if user_id_str.isdigit() else user_id_str
             
             if photo:
                 # Отправка фото с подписью
@@ -110,8 +111,9 @@ class TelegramAdapter(MessageAdapter):
             bool: True если успешно
         """
         try:
+            chat_id_str = str(chat_id)
             await self.bot.edit_message_text(
-                chat_id=int(chat_id) if chat_id.isdigit() else chat_id,
+                chat_id=int(chat_id_str) if chat_id_str.isdigit() else chat_id_str,
                 message_id=message_id,
                 text=text,
                 reply_markup=reply_markup,
@@ -160,11 +162,13 @@ class TelegramAdapter(MessageAdapter):
         но мы храним все ID как строки для совместимости с MAX.
         
         Args:
-            raw_id: int или str
+            raw_id: int или стр
             
         Returns:
             str: Универсальный ID
         """
+        # 🔍 ОТЛАДКА: логируем что приходит
+        logger.info(f"🔍 normalize_user_id: raw={raw_id} (type={type(raw_id).__name__}) -> str={str(raw_id)}")
         return str(raw_id)
     
     @property

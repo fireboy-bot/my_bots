@@ -9,7 +9,8 @@ import json
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
-from config import ADMIN_IDS
+from config import ADMIN_IDS, IS_PRODUCTION
+from core.logger import log_audit_action
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,9 @@ async def debug_progress_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = update.effective_user.id if update.effective_user else 0
     if user_id not in ADMIN_IDS:
         await update.message.reply_text("🔒 Только для администратора.")
+        return
+    if IS_PRODUCTION:
+        await update.message.reply_text("🔒 Команда отключена в production.")
         return
     
     storage = context.bot_data.get('storage')
@@ -61,13 +65,35 @@ async def dump_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     target_id = int(context.args[0]) if context.args and context.args[0].isdigit() else user_id
+    log_audit_action(user_id, "DUMP_USER", f"target={target_id} production={IS_PRODUCTION}")
     
     progress = storage.get_user(target_id) or {}
+
+    if IS_PRODUCTION:
+        # Безопасный краткий дамп для продакшна (без полного JSON).
+        safe = {
+            "user_id": progress.get("user_id", target_id),
+            "level": progress.get("level", 1),
+            "total_score": progress.get("total_score", 0),
+            "score_balance": progress.get("score_balance", 0),
+            "tasks_solved": progress.get("tasks_solved", 0),
+            "tasks_correct": progress.get("tasks_correct", 0),
+            "in_boss_battle": progress.get("in_boss_battle", False),
+            "current_level": progress.get("current_level"),
+            "current_boss": progress.get("current_boss"),
+            "inventory_count": len(progress.get("inventory", [])),
+            "rewards_count": len(progress.get("rewards", [])),
+        }
+        safe_text = json.dumps(safe, indent=2, ensure_ascii=False)
+        await update.message.reply_text(
+            f"📦 **SAFE DUMP {target_id} (production):**\n```\n{safe_text}\n```",
+            parse_mode="Markdown",
+        )
+        return
+
     dump_text = json.dumps(progress, indent=2, ensure_ascii=False)
-    
     if len(dump_text) > 4000:
         dump_text = dump_text[:4000] + "\n... (обрезано)"
-    
     await update.message.reply_text(f"📦 **ДАМП ПОЛЬЗОВАТЕЛЯ {target_id}:**\n```\n{dump_text}\n```", parse_mode="Markdown")
 
 
@@ -84,6 +110,7 @@ async def reset_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     target_id = int(context.args[0]) if context.args and context.args[0].isdigit() else user_id
+    log_audit_action(user_id, "RESET_USER", f"target={target_id}")
     storage.delete_user(target_id)
     
     await update.message.reply_text(f"✅ Прогресс пользователя {target_id} сброшен.")
@@ -124,6 +151,7 @@ async def give_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     progress['inventory'].append(item_id)
     storage.save_user(target_id, progress)
+    log_audit_action(user_id, "GIVE_ITEM", f"target={target_id} item={item_id}")
     
     await update.message.reply_text(f"✅ Предмет {item_id} выдан пользователю {target_id}.")
 
@@ -171,6 +199,7 @@ async def give_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Сохраняем
     storage.save_user(target_id, progress)
+    log_audit_action(user_id, "GIVE_BALANCE", f"target={target_id} amount={amount}")
     
     # Сообщение об успехе
     sign = "+" if amount > 0 else ""
