@@ -1,6 +1,6 @@
 """
 SQLite хранилище прогресса пользователей.
-Версия: 2.16 (Fix: Singleton connection + full restore) 🗄️✅
+Версия: 2.17 (Chaos hooks + Subscription hooks + Security) 🗄️🔐✅
 """
 
 import sqlite3
@@ -10,6 +10,15 @@ import logging
 import re
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
+
+# 🔐 Шифрование для родительских данных (152-ФЗ)
+try:
+    from cryptography.fernet import Fernet
+    from config import PARENT_DATA_KEY
+    _fernet = Fernet(PARENT_DATA_KEY.encode()) if PARENT_DATA_KEY else None
+except ImportError:
+    _fernet = None
+    logging.warning("⚠️ cryptography not installed — parent_email will not be encrypted")
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +60,28 @@ def get_db_path() -> str:
     return os.path.abspath(DB_FILE)
 
 
+# 🔐 Функции шифрования для родительских данных
+def _encrypt_parent_data(data: str) -> str:
+    """Шифрует данные родителя (email, предпочтения)"""
+    if not data or not _fernet:
+        return data
+    return _fernet.encrypt(data.encode()).decode()
+
+
+def _decrypt_parent_data(encrypted: str) -> str:
+    """Расшифровывает данные родителя"""
+    if not encrypted or not _fernet:
+        return encrypted
+    return _fernet.decrypt(encrypted.encode()).decode()
+
+
 class PlayerStorage:
     # ✅ JSON-поля которые хранятся как JSON в БД
     JSON_FIELDS = [
         'defeated_bosses', 'completed_zones', 'inventory', 'rewards', 
         'abilities', 'unlocked_zones', 'achievements', 'castle_decorations', 
-        'artifact_upgrades', 'bank_data', 'castle_data',
-        'player_profile'
+        'artifact_upgrades', 'bank_data', 'castle_data', 'player_profile',
+        'weak_areas', 'report_preferences'  # 🔹 Новые для статистики
     ]
     
     # ✅ Поля игрового состояния — упаковываются в JSON-колонку game_state
@@ -67,7 +91,10 @@ class PlayerStorage:
         'boss_max_health', 'boss_turn', 'boss_task_index', 'just_completed_level',
         'true_lord_error_count', 'true_lord_consecutive_successes',
         'true_lord_used_hint', 'true_lord_secret_unlocked', 'selected_tasks',
-        'selected_boss_tasks', 'boss_abilities_used'
+        'selected_boss_tasks', 'boss_abilities_used',
+        # 🔹 Chaos System поля (в game_state для быстрой сериализации)
+        'consecutive_errors', 'chaos_energy', 'rift_stage', 'artifact_chaos_state',
+        'transfer_tasks_completed'
     ]
     
     # ✅ Колонки в таблице БД
@@ -80,7 +107,20 @@ class PlayerStorage:
         'rewards', 'abilities', 'achievements', 'castle_decorations', 'artifact_upgrades',
         'game_state', 'created_at', 'updated_at',
         'bank_data', 'castle_data', 'player_profile',
-        'first_time'
+        'first_time',
+        # 🔹 CHAOS SYSTEM (отдельные колонки для быстрого доступа)
+        'consecutive_errors', 'chaos_energy', 'rift_stage', 'artifact_chaos_state',
+        'transfer_tasks_completed',
+        # 🔹 DYNAMIC DIFFICULTY (будущее)
+        'difficulty_level_addition', 'difficulty_level_subtraction',
+        'difficulty_level_multiplication', 'difficulty_level_division',
+        'tasks_on_current_level', 'accuracy_last_10',
+        # 🔹 MONETIZATION / PARENT STATS (будущее)
+        'parent_email', 'subscription_tier', 'report_preferences',
+        'weak_areas', 'preferred_practice_time',
+        # 🔹 GENERAL STATS
+        'total_tasks_attempted', 'total_tasks_correct', 'accuracy_overall',
+        'last_session_end'
     ]
     
     def __init__(self):
@@ -90,6 +130,12 @@ class PlayerStorage:
         
         self._ensure_player_profile_column()
         self._ensure_first_time_column()
+        self._ensure_chaos_columns()
+        self._ensure_difficulty_columns()
+        self._ensure_monetization_columns()
+        self._ensure_stats_columns()
+        self._ensure_task_attempts_table()
+        self._ensure_subscriptions_table()
 
     def _ensure_first_time_column(self):
         """Добавляет колонку first_time если её нет."""
@@ -114,6 +160,137 @@ class PlayerStorage:
             cursor.execute("ALTER TABLE users ADD COLUMN player_profile TEXT")
             self.conn.commit()
             logger.info("✅ Колонка player_profile добавлена!")
+    
+    # 🔹 НОВЫЕ МЕТОДЫ: добавляем "крючки" для будущего
+    
+    def _ensure_chaos_columns(self):
+        """Добавляет колонки Chaos System если их нет."""
+        cursor = self.conn.cursor()
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        chaos_cols = [
+            ('consecutive_errors', 'INTEGER DEFAULT 0'),
+            ('chaos_energy', 'INTEGER DEFAULT 0'),
+            ('rift_stage', 'INTEGER DEFAULT 0'),
+            ('artifact_chaos_state', 'TEXT DEFAULT "dormant"'),
+            ('transfer_tasks_completed', 'INTEGER DEFAULT 0')
+        ]
+        
+        for col_name, col_def in chaos_cols:
+            if col_name not in columns:
+                logger.info(f"🔧 Добавляем колонку {col_name}...")
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+                self.conn.commit()
+                logger.info(f"✅ Колонка {col_name} добавлена!")
+    
+    def _ensure_difficulty_columns(self):
+        """Добавляет колонки динамической сложности если их нет."""
+        cursor = self.conn.cursor()
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        diff_cols = [
+            ('difficulty_level_addition', 'INTEGER DEFAULT 1'),
+            ('difficulty_level_subtraction', 'INTEGER DEFAULT 1'),
+            ('difficulty_level_multiplication', 'INTEGER DEFAULT 1'),
+            ('difficulty_level_division', 'INTEGER DEFAULT 1'),
+            ('tasks_on_current_level', 'INTEGER DEFAULT 0'),
+            ('accuracy_last_10', 'REAL DEFAULT 1.0')
+        ]
+        
+        for col_name, col_def in diff_cols:
+            if col_name not in columns:
+                logger.info(f"🔧 Добавляем колонку {col_name}...")
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+                self.conn.commit()
+                logger.info(f"✅ Колонка {col_name} добавлена!")
+    
+    def _ensure_monetization_columns(self):
+        """Добавляет колонки монетизации/статистики если их нет."""
+        cursor = self.conn.cursor()
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        monet_cols = [
+            ('parent_email', 'TEXT'),  # 🔐 Шифровать при сохранении!
+            ('subscription_tier', 'TEXT DEFAULT "free"'),
+            ('report_preferences', 'TEXT'),  # JSON
+            ('weak_areas', 'TEXT'),  # JSON
+            ('preferred_practice_time', 'TEXT DEFAULT "any"')
+        ]
+        
+        for col_name, col_def in monet_cols:
+            if col_name not in columns:
+                logger.info(f"🔧 Добавляем колонку {col_name}...")
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+                self.conn.commit()
+                logger.info(f"✅ Колонка {col_name} добавлена!")
+    
+    def _ensure_stats_columns(self):
+        """Добавляет общие статистические колонки если их нет."""
+        cursor = self.conn.cursor()
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        stats_cols = [
+            ('total_tasks_attempted', 'INTEGER DEFAULT 0'),
+            ('total_tasks_correct', 'INTEGER DEFAULT 0'),
+            ('accuracy_overall', 'REAL DEFAULT 1.0'),
+            ('last_session_end', 'DATETIME')
+        ]
+        
+        for col_name, col_def in stats_cols:
+            if col_name not in columns:
+                logger.info(f"🔧 Добавляем колонку {col_name}...")
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+                self.conn.commit()
+                logger.info(f"✅ Колонка {col_name} добавлена!")
+    
+    def _ensure_task_attempts_table(self):
+        """Создаёт таблицу task_attempts если её нет."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                task_id TEXT NOT NULL,
+                island_id TEXT NOT NULL,
+                operation_type TEXT NOT NULL,
+                is_correct BOOLEAN NOT NULL,
+                time_taken_seconds REAL,
+                answer_given TEXT,
+                expected_answer TEXT,
+                chaos_energy INTEGER DEFAULT 0,
+                rift_stage INTEGER DEFAULT 0,
+                transfer_task_used BOOLEAN DEFAULT 0,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(user_id)
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_attempts_user ON task_attempts(user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_attempts_time ON task_attempts(timestamp)")
+        self.conn.commit()
+        logger.info("✅ Таблица task_attempts готова")
+    
+    def _ensure_subscriptions_table(self):
+        """Создаёт таблицу subscriptions если её нет."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL UNIQUE,
+                parent_email TEXT,
+                subscription_status TEXT DEFAULT 'free',
+                subscription_start DATETIME,
+                subscription_end DATETIME,
+                report_frequency TEXT DEFAULT 'weekly',
+                weak_areas_focus TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(user_id)
+            )
+        """)
+        self.conn.commit()
+        logger.info("✅ Таблица subscriptions готова")
     
     def get_db_path(self) -> str:
         return get_db_path()
@@ -155,9 +332,17 @@ class PlayerStorage:
                 try:
                     data[field] = json.loads(data[field])
                 except (json.JSONDecodeError, TypeError):
-                    data[field] = [] if field not in ['achievements', 'artifact_upgrades', 'bank_data', 'castle_data', 'player_profile'] else {}
+                    data[field] = [] if field not in ['achievements', 'artifact_upgrades', 'bank_data', 'castle_data', 'player_profile', 'weak_areas', 'report_preferences'] else {}
             elif field in data:
-                data[field] = [] if field not in ['achievements', 'artifact_upgrades', 'bank_data', 'castle_data', 'player_profile'] else {}
+                data[field] = [] if field not in ['achievements', 'artifact_upgrades', 'bank_data', 'castle_data', 'player_profile', 'weak_areas', 'report_preferences'] else {}
+        
+        # 🔐 Расшифровываем parent_email при чтении
+        if 'parent_email' in data and data['parent_email']:
+            try:
+                data['parent_email'] = _decrypt_parent_data(data['parent_email'])
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось расшифровать parent_email: {e}")
+                data['parent_email'] = None
         
         # FIX: Десериализуем bank_data, castle_data и player_profile отдельно
         for field in ['bank_data', 'castle_data', 'player_profile']:
@@ -210,14 +395,43 @@ class PlayerStorage:
                 "last_comment": 0, "mystery_unlocked": False, "comment_count": 0,
             }
         
-        # ГАРАНТИРУЕМ ПОЛЯ ИГРОВОГО СОСТОЯНИЯ
+        # 🔹 Гарантируем новые поля
+        for field in ['consecutive_errors', 'chaos_energy', 'rift_stage', 'transfer_tasks_completed']:
+            if field not in data or data[field] is None:
+                data[field] = 0 if field != 'artifact_chaos_state' else 'dormant'
+        
+        for field in ['difficulty_level_addition', 'difficulty_level_subtraction', 'difficulty_level_multiplication', 'difficulty_level_division']:
+            if field not in data or data[field] is None:
+                data[field] = 1
+        
+        if 'tasks_on_current_level' not in data or data['tasks_on_current_level'] is None:
+            data['tasks_on_current_level'] = 0
+        if 'accuracy_last_10' not in data or data['accuracy_last_10'] is None:
+            data['accuracy_last_10'] = 1.0
+        
+        if 'subscription_tier' not in data or data['subscription_tier'] is None:
+            data['subscription_tier'] = 'free'
+        if 'preferred_practice_time' not in data or data['preferred_practice_time'] is None:
+            data['preferred_practice_time'] = 'any'
+        
+        if 'total_tasks_attempted' not in data or data['total_tasks_attempted'] is None:
+            data['total_tasks_attempted'] = 0
+        if 'total_tasks_correct' not in data or data['total_tasks_correct'] is None:
+            data['total_tasks_correct'] = 0
+        if 'accuracy_overall' not in data or data['accuracy_overall'] is None:
+            data['accuracy_overall'] = 1.0
+        
+        # Гарантируем GAME_STATE_FIELDS
         for field in self.GAME_STATE_FIELDS:
             if field not in data:
                 if field in ['current_level', 'current_boss']:
                     data[field] = None
                 elif field in ['current_task_index', 'boss_health', 'boss_turn', 'boss_task_index', 
-                              'mistakes_in_level', 'true_lord_error_count', 'true_lord_consecutive_successes']:
+                              'mistakes_in_level', 'true_lord_error_count', 'true_lord_consecutive_successes',
+                              'consecutive_errors', 'chaos_energy', 'rift_stage', 'transfer_tasks_completed']:
                     data[field] = 0
+                elif field == 'artifact_chaos_state':
+                    data[field] = 'dormant'
                 elif field in ['selected_tasks', 'selected_boss_tasks', 'boss_abilities_used']:
                     data[field] = []
                 elif field in ['in_boss_battle', 'in_secret_level', 'just_completed_level', 
@@ -238,11 +452,14 @@ class PlayerStorage:
                 game_state[key] = value
             elif key in self.JSON_FIELDS and key in self.DB_COLUMNS:
                 if value is None:
-                    value = [] if key not in ['achievements', 'artifact_upgrades', 'bank_data', 'castle_data', 'player_profile'] else {}
+                    value = [] if key not in ['achievements', 'artifact_upgrades', 'bank_data', 'castle_data', 'player_profile', 'weak_areas', 'report_preferences'] else {}
                 result[key] = json.dumps(value, ensure_ascii=False) if value else None
             elif key in self.DB_COLUMNS and key not in ['game_state', 'created_at', 'user_id']:
                 if key == 'first_time':
                     result[key] = 1 if value else 0
+                elif key == 'parent_email' and value:
+                    # 🔐 Шифруем email перед сохранением
+                    result[key] = _encrypt_parent_data(value)
                 else:
                     result[key] = value
         
@@ -297,7 +514,21 @@ class PlayerStorage:
                 },
                 "in_boss_battle": False, "current_boss": None, "current_level": None,
                 "selected_tasks": [], "current_task_index": 0, "first_time": True,
-                "completed_normal_game": False, "soul_shards": 0, "absolute_victory": False
+                "completed_normal_game": False, "soul_shards": 0, "absolute_victory": False,
+                # 🔹 Chaos System defaults
+                "consecutive_errors": 0, "chaos_energy": 0, "rift_stage": 0,
+                "artifact_chaos_state": "dormant", "transfer_tasks_completed": 0,
+                # 🔹 Dynamic difficulty defaults
+                "difficulty_level_addition": 1, "difficulty_level_subtraction": 1,
+                "difficulty_level_multiplication": 1, "difficulty_level_division": 1,
+                "tasks_on_current_level": 0, "accuracy_last_10": 1.0,
+                # 🔹 Monetization defaults
+                "parent_email": None, "subscription_tier": "free",
+                "report_preferences": None, "weak_areas": None,
+                "preferred_practice_time": "any",
+                # 🔹 Stats defaults
+                "total_tasks_attempted": 0, "total_tasks_correct": 0,
+                "accuracy_overall": 1.0, "last_session_end": None
             }
             db_data = self._serialize_for_db(default_data)
             db_data['created_at'] = datetime.now(timezone.utc).isoformat()
@@ -382,9 +613,100 @@ class PlayerStorage:
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM score_log WHERE user_id = ?", (user_id_int,))
         cursor.execute("DELETE FROM task_history WHERE user_id = ?", (user_id_int,))
+        cursor.execute("DELETE FROM task_attempts WHERE user_id = ?", (user_id_int,))
+        cursor.execute("DELETE FROM subscriptions WHERE user_id = ?", (user_id_int,))
         cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id_int,))
         self.conn.commit()
         logger.info(f"🗑️ Пользователь {user_id_int} и его данные удалены")
+    
+    # 🔹 НОВЫЕ МЕТОДЫ для статистики и монетизации
+    
+    def log_task_attempt(self, user_id: int, task_id: str, island_id: str, 
+                        operation_type: str, is_correct: bool, 
+                        time_taken: float = None, answer_given: str = None,
+                        expected_answer: str = None, chaos_energy: int = None,
+                        rift_stage: int = None, transfer_used: bool = False) -> bool:
+        """Логирует попытку решения задачи для статистики."""
+        try:
+            user_id_int = self._extract_numeric_user_id(user_id)
+            cursor = self.conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO task_attempts (
+                    user_id, task_id, island_id, operation_type, is_correct,
+                    time_taken_seconds, answer_given, expected_answer,
+                    chaos_energy, rift_stage, transfer_task_used
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                user_id_int, task_id, island_id, operation_type, is_correct,
+                time_taken, answer_given, expected_answer,
+                chaos_energy, rift_stage, transfer_used
+            ))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"❌ Ошибка log_task_attempt: {e}")
+            self.conn.rollback()
+            return False
+    
+    def get_user_weaknesses(self, user_id: int, limit: int = 5) -> List[Dict]:
+        """Возвращает слабые зоны пользователя на основе истории."""
+        user_id_int = self._extract_numeric_user_id(user_id)
+        cursor = self.conn.cursor()
+        
+        cursor.execute("""
+            SELECT 
+                island_id, operation_type,
+                COUNT(*) as total,
+                SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct,
+                ROUND(1.0 * SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) / COUNT(*) * 100, 1) as accuracy
+            FROM task_attempts
+            WHERE user_id = ? AND timestamp >= datetime('now', '-7 days')
+            GROUP BY island_id, operation_type
+            HAVING COUNT(*) >= 3
+            ORDER BY accuracy ASC
+            LIMIT ?
+        """, (user_id_int, limit))
+        
+        return [dict(row) for row in cursor.fetchall()]
+    
+    def get_subscription_info(self, user_id: int) -> Dict:
+        """Возвращает информацию о подписке пользователя."""
+        user_id_int = self._extract_numeric_user_id(user_id)
+        cursor = self.conn.cursor()
+        
+        cursor.execute("""
+            SELECT subscription_status, subscription_start, subscription_end, report_frequency
+            FROM subscriptions WHERE user_id = ?
+        """, (user_id_int,))
+        
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return {"subscription_status": "free"}
+    
+    def update_subscription(self, user_id: int, status: str, parent_email: str = None, 
+                           frequency: str = 'weekly') -> bool:
+        """Обновляет информацию о подписке."""
+        try:
+            user_id_int = self._extract_numeric_user_id(user_id)
+            cursor = self.conn.cursor()
+            
+            # 🔐 Шифруем email если есть
+            encrypted_email = _encrypt_parent_data(parent_email) if parent_email else None
+            
+            cursor.execute("""
+                INSERT OR REPLACE INTO subscriptions 
+                (user_id, parent_email, subscription_status, report_frequency, subscription_start)
+                VALUES (?, ?, ?, ?, datetime('now'))
+            """, (user_id_int, encrypted_email, status, frequency))
+            
+            self.conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"❌ Ошибка update_subscription: {e}")
+            self.conn.rollback()
+            return False
     
     def log_score_change(self, user_id: int, amount: int, reason: str, 
                         context: str = None, season_id: int = None) -> bool:

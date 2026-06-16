@@ -1,0 +1,414 @@
+/* 🔹 КОНТЕЙНЕР АРТЕФАКТА */
+.chaos-artifact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  width: 100%;
+  max-width: 240px;
+  position: relative;
+  overflow: visible; /* 🔹 для частиц снаружи */
+  transition: all var(--transition-delay, 0.2s) ease;
+}
+
+/* 🔹 ВНЕШНЕЕ СВЕЧЕНИЕ */
+.chaos-glow-outer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 140%;
+  height: 140%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--glow-color) 0%, transparent 65%);
+  opacity: 0.35;
+  filter: blur(25px);
+  pointer-events: none;
+  animation: glowPulse 3.5s ease-in-out infinite;
+  transition: opacity var(--transition-delay, 0.2s) ease;
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.25; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.45; transform: translate(-50%, -50%) scale(1.07); }
+}
+
+/* 🔹 ЯДРО (круг) */
+.chaos-core {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  /* 🔹 ОРГАНИЧЕСКАЯ ПУЛЬСАЦИЯ (несимметричное дыхание) */
+  animation: organicPulse 4.2s ease-in-out infinite;
+}
+
+@keyframes organicPulse {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.04); }
+  55% { transform: scale(0.985); }
+  75% { transform: scale(1.055); }
+  100% { transform: scale(1); }
+}
+
+/* 🔹 БАЗОВЫЙ ГРАДИЕНТ */
+.chaos-gradient {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 30% 30%,
+    var(--core-color) 0%,
+    rgba(139, 92, 246, 0.75) 45%,
+    rgba(76, 29, 149, 0.55) 75%,
+    transparent 100%
+  );
+  animation: coreRotate 9s linear infinite;
+  transition: background var(--transition-delay, 0.2s) ease;
+}
+
+@keyframes coreRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 🔹 ВНУТРЕННЕЕ ДВИЖЕНИЕ (энергия внутри) */
+.chaos-inner-flow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.1) 25%,
+    transparent 60%
+  );
+  mix-blend-mode: screen;
+  animation: innerFlow 6.5s linear infinite;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+@keyframes innerFlow {
+  0% { transform: rotate(0deg) scale(1); opacity: 0.7; }
+  50% { transform: rotate(180deg) scale(1.08); opacity: 0.95; }
+  100% { transform: rotate(360deg) scale(1); opacity: 0.7; }
+}
+
+/* 🔹 ИКОНКА */
+.chaos-icon {
+  font-size: 2rem;
+  z-index: 3;
+  position: relative;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.6));
+  animation: iconFloat 2.2s ease-in-out infinite;
+  transition: filter var(--transition-delay, 0.2s) ease;
+}
+
+@keyframes iconFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* 🔹 МИКРОТРЕЩИНЫ */
+.chaos-cracks {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.crack {
+  position: absolute;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+  border-radius: 2px;
+  opacity: 0;
+  animation: crackAppear 0.6s ease-out forwards, crackPulse 2.4s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.crack-1 {
+  width: 32px; height: 2px;
+  top: 18%; left: 8%;
+  transform: rotate(-28deg);
+  animation-delay: 0.3s, 0s;
+}
+
+.crack-2 {
+  width: 28px; height: 2px;
+  top: 62%; right: 12%;
+  transform: rotate(42deg);
+  animation-delay: 0.5s, 0.8s;
+}
+
+.crack-3 {
+  width: 24px; height: 2px;
+  bottom: 22%; left: 38%;
+  transform: rotate(-12deg);
+  animation-delay: 0.7s, 1.6s;
+}
+
+@keyframes crackAppear {
+  to { opacity: 1; }
+}
+
+@keyframes crackPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(255, 255, 255, 0.4); }
+  50% { box-shadow: 0 0 14px rgba(255, 255, 255, 0.9); }
+}
+
+/* 🔹 ИМПУЛЬС ПО ТРЕЩИНАМ */
+.crack-impulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 40%, rgba(255, 255, 255, 0.15) 60%, transparent 75%);
+  animation: impulseTravel 3s ease-in-out infinite;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes impulseTravel {
+  0%, 100% { opacity: 0; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* 🔹 МИКРО-ЧАСТИЦЫ ВОКРУГ ЯДРА */
+.chaos-particles {
+  position: absolute;
+  inset: -15px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.particle {
+  position: absolute;
+  width: var(--size, 3px);
+  height: var(--size, 3px);
+  border-radius: 50%;
+  background: var(--color, #8b5cf6);
+  box-shadow: 0 0 6px var(--color, #8b5cf6);
+  opacity: 0;
+  animation: particleFloat 3.5s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+/* 🔹 Распределение частиц по кругу */
+.particle:nth-child(1) { top: 10%; left: 50%; animation-delay: 0s; }
+.particle:nth-child(2) { top: 30%; right: 5%; animation-delay: 0.4s; }
+.particle:nth-child(3) { bottom: 20%; left: 15%; animation-delay: 0.8s; }
+.particle:nth-child(4) { top: 60%; left: 5%; animation-delay: 1.2s; }
+.particle:nth-child(5) { bottom: 40%; right: 20%; animation-delay: 1.6s; }
+
+@keyframes particleFloat {
+  0% { 
+    opacity: 0; 
+    transform: translateY(0) scale(0.8); 
+  }
+  15% { 
+    opacity: 0.9; 
+  }
+  85% { 
+    opacity: 0.9; 
+  }
+  100% { 
+    opacity: 0; 
+    transform: translateY(-25px) scale(1.2); 
+  }
+}
+
+/* 🔹 ВИБРАЦИЯ + ГЛИТЧ (overload) */
+.chaos-vibrate {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid rgba(239, 68, 68, 0.6);
+  animation: vibrate 0.08s infinite;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+@keyframes vibrate {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(-1px, 1px) rotate(-0.5deg); }
+  50% { transform: translate(1px, -1px) rotate(0.5deg); }
+  75% { transform: translate(-1px, -1px) rotate(-0.5deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* 🔹 МИКРО-ГЛИТЧ (редкий, раз в 3-5 сек) */
+.chaos-glitch {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, transparent 40%, rgba(239, 68, 68, 0.3) 50%, transparent 60%);
+  opacity: 0;
+  animation: glitchRare 4s steps(2) infinite;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+@keyframes glitchRare {
+  0%, 85%, 100% { opacity: 0; transform: translate(0, 0); }
+  87% { opacity: 0.6; transform: translate(-1px, 1px); }
+  89% { opacity: 0.4; transform: translate(1px, -1px); }
+  91% { opacity: 0; transform: translate(0, 0); }
+}
+
+/* 🔹 ПОЛОСА ЭНЕРГИИ */
+.chaos-energy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.energy-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.energy-fill {
+  height: 100%;
+  border-radius: 4px;
+  /* transition задаётся инлайн в JSX для задержки реакции */
+}
+
+.energy-text {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #E2E8F0;
+  min-width: 40px;
+  text-align: right;
+  transition: color var(--transition-delay, 0.2s) ease;
+}
+
+/* 🔹 ПОДПИСЬ СОСТОЯНИЯ */
+.chaos-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94A3B8;
+  transition: color var(--transition-delay, 0.2s) ease;
+}
+
+/* 🔹 СОСТОЯНИЯ: ЦВЕТА И АНИМАЦИИ */
+
+/* 🟢 Dormant */
+.chaos-artifact--dormant .chaos-glow-outer { --glow-color: rgba(34, 197, 94, 0.4); animation-duration: 4.5s; }
+.chaos-artifact--dormant .chaos-gradient { --core-color: #22c55e; }
+.chaos-artifact--dormant .chaos-inner-flow { opacity: 0.6; }
+
+/* 🔵 Awakened (cyan вместо лайма) */
+.chaos-artifact--awakened .chaos-glow-outer { --glow-color: rgba(34, 211, 238, 0.55); animation-duration: 3.2s; }
+.chaos-artifact--awakened .chaos-gradient { --core-color: #22d3ee; }
+.chaos-artifact--awakened .chaos-icon { animation: iconPulse 1.6s ease-in-out infinite; }
+.chaos-artifact--awakened .particle { --color: #22d3ee; }
+
+@keyframes iconPulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(255,255,255,0.6)); }
+  50% { transform: scale(1.12); filter: drop-shadow(0 0 18px rgba(34, 211, 238, 0.9)); }
+}
+
+/* 🟠 Active */
+.chaos-artifact--active .chaos-glow-outer { --glow-color: rgba(234, 179, 8, 0.65); animation-duration: 2.1s; }
+.chaos-artifact--active .chaos-gradient { --core-color: #eab308; }
+.chaos-artifact--active .crack { opacity: 1; }
+.chaos-artifact--active .chaos-icon { animation: iconSpark 0.9s ease-in-out infinite; }
+.chaos-artifact--active .particle { --color: #eab308; animation-duration: 2.8s; }
+
+@keyframes iconSpark {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(255,255,255,0.6)); }
+  50% { filter: drop-shadow(0 0 24px rgba(234, 179, 8, 0.95)); }
+}
+
+/* 🔴 Overload (фиолет+красный микс) */
+.chaos-artifact--overload .chaos-glow-outer { 
+  --glow-color: rgba(168, 85, 247, 0.75); 
+  animation-duration: 0.7s; 
+  opacity: 0.65; 
+}
+.chaos-artifact--overload .chaos-gradient { 
+  --core-color: #ef4444; 
+  animation-duration: 2.5s;
+  background: radial-gradient(
+    circle at 30% 30%,
+    #ef4444 0%,
+    rgba(168, 85, 247, 0.85) 40%,
+    rgba(76, 29, 149, 0.7) 75%,
+    transparent 100%
+  );
+}
+.chaos-artifact--overload .crack { 
+  opacity: 1; 
+  background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.95), transparent);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+}
+.chaos-artifact--overload .chaos-icon { 
+  animation: iconShake 0.35s ease-in-out infinite; 
+  filter: drop-shadow(0 0 16px rgba(239, 68, 68, 0.9));
+}
+.chaos-artifact--overload .particle { 
+  --color: #ef4444; 
+  animation-duration: 1.4s; 
+  box-shadow: 0 0 10px #ef4444;
+}
+
+@keyframes iconShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2.5px); }
+  75% { transform: translateX(2.5px); }
+}
+
+/* 🔹 УРОВНИ ЭНЕРГИИ (доп. усиление) */
+.energy-high .chaos-core { animation-duration: 3.2s; }
+.energy-high .chaos-inner-flow { animation-duration: 4.5s; opacity: 0.95; }
+
+.energy-mid .chaos-core { animation-duration: 3.8s; }
+
+.energy-low .chaos-inner-flow { opacity: 0.5; }
+
+/* 🔹 АДАПТИВ */
+@media (max-width: 1024px) {
+  .chaos-artifact {
+    max-width: 200px;
+    padding: 12px;
+  }
+  .chaos-core {
+    width: 60px;
+    height: 60px;
+  }
+  .chaos-icon { font-size: 1.5rem; }
+  .chaos-particles { inset: -10px; }
+  .particle { width: 2px; height: 2px; }
+}
+
+/* 🔹 ПРЕФЕРЕНЦИЯ: reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .chaos-core,
+  .chaos-gradient,
+  .chaos-inner-flow,
+  .chaos-icon,
+  .particle,
+  .crack,
+  .chaos-vibrate,
+  .chaos-glitch {
+    animation: none !important;
+    transition: none !important;
+  }
+}

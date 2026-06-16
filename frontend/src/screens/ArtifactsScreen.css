@@ -1,0 +1,221 @@
+/* 🔮 ЭКРАН АРТЕФАКТОВ */
+.artifacts-screen {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 20px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: transparent !important;
+  padding-bottom: 120px;
+}
+
+/* 🔹 ЗАГРУЗКА */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #94A3B8;
+  font-size: 16px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* 🔹 HEADER */
+.artifacts-screen__header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  padding-top: 10px;
+}
+
+.back-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 8px 16px;
+  color: #E2E8F0;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateX(-2px);
+}
+
+.artifacts-screen__header h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #E2E8F0;
+}
+
+/* 🔹 СООБЩЕНИЕ ВЛАДИМИРА */
+.vladimir-message {
+  background: rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.vladimir-message p {
+  margin: 0;
+  color: #E2E8F0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.vladimir-message p strong {
+  color: #FFD93D;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 🔹 ПРЕДУПРЕЖДЕНИЕ PRO UPKEEP */
+.upkeep-warning-banner {
+  background: rgba(248, 113, 113, 0.2);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 20px;
+  color: #F87171;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* 🔹 СПИСОК АРТЕФАКТОВ */
+.artifacts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.artifact-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.artifact-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.artifact-icon {
+  font-size: 32px;
+}
+
+.artifact-header strong {
+  color: #E2E8F0;
+  font-size: 16px;
+  display: block;
+}
+
+.artifact-desc {
+  color: #94A3B8;
+  font-size: 13px;
+  margin: 0;
+}
+
+.artifact-stats {
+  margin-bottom: 15px;
+}
+
+.artifact-stats div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  color: #94A3B8;
+  font-size: 14px;
+}
+
+.artifact-stats strong {
+  color: #E2E8F0;
+}
+
+.artifact-stats strong.ok {
+  color: #4ADE80;
+}
+
+.artifact-stats strong.warn {
+  color: #F87171;
+}
+
+.upgrade-btn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #7C3AED, #667eea);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.upgrade-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+}
+
+.upgrade-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(124, 58, 237, 0.3);
+}
+
+.maxed {
+  text-align: center;
+  padding: 10px;
+  background: rgba(251, 191, 36, 0.2);
+  border-radius: 8px;
+  color: #FFD93D;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* 🔹 СООБЩЕНИЯ */
+.message {
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  font-weight: 500;
+  animation: slideIn 0.3s ease-out;
+  font-size: 14px;
+}
+
+.message--success {
+  background: rgba(74, 222, 128, 0.2);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  color: #4ADE80;
+}
+
+.message--error {
+  background: rgba(248, 113, 113, 0.2);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #F87171;
+}
+
+/* 🔹 АДАПТИВ */
+@media (max-width: 480px) {
+  .artifacts-screen {
+    padding: 15px;
+  }
+}

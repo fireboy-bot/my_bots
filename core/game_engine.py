@@ -1,12 +1,12 @@
-# core/game_engine.py
 """
 Главное ядро игры Числяндия.
-Версия: 3.2 (Fix: Bank Info Direct DB Read) 🧠🔮🏦✅
+Версия: 3.3 (Chaos System Integration) 🧠🔮🌋✅
 """
 
 import logging
 import sqlite3
-from typing import Dict, Any, Optional, Tuple
+import random
+from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime, timezone
 from database.storage import PlayerStorage
 from core.score_manager import ScoreManager
@@ -25,52 +25,301 @@ class ChislyandiaEngine:
         
         logger.info("✅ ChislyandiaEngine (ядро) инициализировано")
     
+    # =============================================================================
+    # 🔥 CHAOS SYSTEM: НОВЫЕ МЕТОДЫ
+    # =============================================================================
+    
+    def _calculate_rift_stage(self, consecutive_errors: int) -> int:
+        """
+        Рассчитывает стадию Разлома на основе ошибок подряд.
+        
+        Стадии:
+        0 = спокойно (0 ошибок)
+        1 = лёгкий треск (1-2 ошибки)
+        2 = числа плывут (3-4 ошибки)
+        3 = нестабильность (5-6 ошибок)
+        4 = перегрузка (7+ ошибок)
+        """
+        if consecutive_errors == 0:
+            return 0
+        elif consecutive_errors <= 2:
+            return 1
+        elif consecutive_errors <= 4:
+            return 2
+        elif consecutive_errors <= 6:
+            return 3
+        else:
+            return 4
+    
+    def _get_artifact_chaos_state(self, chaos_energy: int, rift_stage: int) -> str:
+        """
+        Определяет состояние Артефакта Хаоса.
+        
+        Состояния:
+        - 'dormant': спящий (хаос < 20)
+        - 'awakened': пробуждён (хаос 20-59)
+        - 'active': активный (хаос 60-99)
+        - 'overload': перегрузка (хаос = 100 ИЛИ стадия 4)
+        """
+        if rift_stage >= 4 or chaos_energy >= 100:
+            return "overload"
+        elif chaos_energy >= 60:
+            return "active"
+        elif chaos_energy >= 20:
+            return "awakened"
+        else:
+            return "dormant"
+    
+    def _generate_options(self, correct: int, min_val: int, max_val: int, count: int = 4) -> List[str]:
+        """Генерирует варианты ответов (вспомогательная функция)."""
+        options = {str(correct)}
+        while len(options) < count:
+            wrong = correct + random.randint(-15, 15)
+            if wrong != correct and min_val <= wrong <= max_val:
+                options.add(str(wrong))
+        options_list = list(options)
+        random.shuffle(options_list)
+        return options_list
+    
+    def _generate_transfer_task(self, original_task: dict, user: dict) -> dict:
+        """
+        Генерирует задачу-перенос на основе оригинальной.
+        🔹 ЗАЩИЩЁННАЯ ВЕРСИЯ: использует .get() с дефолтами
+        """
+        original_question = original_task.get("question", "Задача")
+        island = original_task.get("island", "unknown")
+        operation_type = original_task.get("operation_type", "unknown")
+        original_options = original_task.get("options", ["8", "9", "10", "11"])  # ← ДЕФОЛТ!
+        correct_answer = original_task.get("correct_answer", "8")
+        base_score = original_task.get("score", 10)
+    
+        # 🔹 Перестановка для умножения (коммутативность)
+        if island == "multiplication" and "×" in original_question:
+            parts = original_question.split("×")
+            if len(parts) == 2:
+                a = parts[0].strip().replace("=?", "").strip()
+                b = parts[1].strip().replace("=?", "").strip()
+                new_question = f"{b} × {a} = ?"
+            
+                options = self._generate_options(int(correct_answer), min_val=int(correct_answer)-20, max_val=int(correct_answer)+20)
+            
+                return {
+                    "id": f"transfer_{original_task.get('id', 'unknown')}",
+                    "question": new_question,
+                    "options": options,
+                    "correct_answer": correct_answer,
+                    "score": max(5, base_score - 5),
+                    "island": island,
+                    "operation_type": operation_type,
+                    "is_transfer": True,
+                    "rift_closing": True
+                }
+    
+        # 🔹 Перестановка для сложения (коммутативность)
+        if island == "addition" and "+" in original_question:
+            parts = original_question.split("+")
+            if len(parts) == 2:
+                a = parts[0].strip().replace("=?", "").strip()
+                b = parts[1].strip().replace("=?", "").strip()
+                new_question = f"{b} + {a} = ?"
+            
+                options = self._generate_options(int(correct_answer), min_val=int(correct_answer)-20, max_val=int(correct_answer)+20)
+            
+                return {
+                    "id": f"transfer_{original_task.get('id', 'unknown')}",
+                    "question": new_question,
+                    "options": options,
+                    "correct_answer": correct_answer,
+                    "score": max(5, base_score - 5),
+                    "island": island,
+                    "operation_type": operation_type,
+                    "is_transfer": True,
+                    "rift_closing": True
+                }
+    
+        # 🔹 ЗАЩИЩЁННАЯ заглушка для других типов
+        return {
+            "id": f"transfer_{original_task.get('id', 'unknown')}",
+            "question": original_question,
+            "options": original_options,  # ← Берём из .get() с дефолтом!
+            "correct_answer": correct_answer,
+            "score": max(5, base_score - 5),
+            "island": island,
+            "operation_type": operation_type,
+            "is_transfer": True,
+            "rift_closing": True,
+            "hint": "Примени ту же идею, но иначе!"
+        }
+    
+    def _get_character_message(self, user: dict, is_correct: bool, rift_stage: int) -> str:
+        """Возвращает сообщение от персонажа в зависимости от ситуации."""
+        # 🔹 Владимир комментирует Разлом
+        if rift_stage == 0:
+            if is_correct:
+                return "🎩 «Превосходно, сударыня. Порядок восстановлен.»"
+            else:
+                return "🎩 «Числа колеблются... соберитесь, сударыня.»"
+        elif rift_stage <= 2:
+            return "🎩 «Смысл ускользает... попробуйте иначе.»"
+        elif rift_stage == 3:
+            return "🎩 «Хаос нарастает! Вспомните основу!»"
+        else:  # rift_stage == 4
+            return "🎩 «ПЕРЕГРУЗКА! Остановитесь. Восстановите порядок.»"
+    
+    # =============================================================================
+    # 🔥 ОБНОВЛЁННЫЙ solve_task С CHAOS SYSTEM
+    # =============================================================================
+    
     def solve_task(
         self,
         user_id: str,
         answer: Any,
         task_id: str,
-        expected_answer: Any
+        expected_answer: Any,
+        island_id: Optional[str] = None,
+        operation_type: Optional[str] = None,
+        is_transfer: bool = False
     ) -> Dict[str, Any]:
-        """Проверяет ответ на задачу"""
+        """
+        Проверяет ответ на задачу с учётом Chaos System.
+        
+        Возвращает расширенный ответ для витрины:
+        {
+            "correct": bool,
+            "reward": int,
+            "message": str,
+            "chaos_state": { ... },  # Для визуала Разлома/Артефакта
+            "transfer_task": { ... } or None  # Если нужна задача-перенос
+        }
+        """
+        # 🔹 Базовая проверка ответа
+        is_correct = (str(answer).strip() == str(expected_answer).strip())
+        
+        # 🔹 Получаем пользователя
         user = self.storage.get_user(user_id)
         if not user:
-            return {"correct": False, "message": "❌ Игрок не найден"}
+            return {"correct": False, "reward": 0, "message": "❌ Игрок не найден", "chaos_state": None, "transfer_task": None}
         
-        is_correct = (answer == expected_answer)
-        
+        # 🔹 Обновляем статистику ошибок (Chaos System)
         if is_correct:
-            base_score = self._get_task_reward(task_id, user)
-            final_score = self.score_manager.add_score(
-                user_id=user_id,
-                amount=base_score,
-                reason="task_correct",
-                context=task_id,
-                apply_artifacts=True
-            )
-            level_up = self._check_level_progress(user_id, user)
-            
-            return {
-                "correct": True,
-                "score_earned": final_score,
-                "level_up": level_up,
-                "message": f"✅ Правильно! +{final_score} очков"
-            }
+            user["consecutive_errors"] = 0
+            user["chaos_energy"] = max(0, user.get("chaos_energy", 0) - 10)
         else:
-            base_penalty = self._get_task_penalty(task_id, user)
-            final_penalty = self.score_manager.apply_penalty(
-                user_id=user_id,
-                base_penalty=base_penalty,
-                reason="task_mistake",
-                context=task_id
-            )
-            
-            return {
-                "correct": False,
-                "score_earned": final_penalty,
-                "level_up": False,
-                "message": f"❌ Ошибка! {final_penalty} очков"
+            user["consecutive_errors"] = user.get("consecutive_errors", 0) + 1
+            user["chaos_energy"] = min(100, user.get("chaos_energy", 0) + 20)
+        
+        # 🔹 Пересчитываем стадию Разлома и состояние Артефакта
+        rift_stage = self._calculate_rift_stage(user["consecutive_errors"])
+        artifact_state = self._get_artifact_chaos_state(user["chaos_energy"], rift_stage)
+        
+        # 🔹 Рассчитываем награду (с учётом анти-абуза)
+        base_score = self._get_task_reward(task_id, user) if is_correct else 0
+        base_penalty = self._get_task_penalty(task_id, user) if not is_correct else 0
+        
+        # 🔹 Анти-абуз: 7+ ошибок подряд = 0 наград (но штраф остаётся)
+        if user["consecutive_errors"] >= 7 and is_correct:
+            reward = 0
+        elif is_correct:
+            # 🔹 Если это задача-перенос — чуть меньше очков
+            reward = base_score - 5 if is_transfer else base_score
+            reward = max(5, reward)  # Минимум 5 очков
+        else:
+            reward = base_penalty
+        
+        # 🔹 Применяем награду/штраф через ScoreManager (если не перегрузка)
+        if reward != 0:
+            if reward > 0:
+                self.score_manager.add_score(
+                    user_id=user_id,
+                    amount=reward,
+                    reason="task_correct" if not is_transfer else "transfer_correct",
+                    context=task_id,
+                    apply_artifacts=True
+                )
+            else:
+                self.score_manager.apply_penalty(
+                    user_id=user_id,
+                    base_penalty=abs(reward),
+                    reason="task_mistake",
+                    context=task_id
+                )
+        
+        # 🔹 Генерируем задачу-перенос если нужна (ошибка + 2+ подряд + НЕ уже перенос)
+        transfer_task = None
+        if not is_correct and not is_transfer and user["consecutive_errors"] >= 2:
+            # 🔹 Создаём заглушку оригинальной задачи (в реальности брать из истории)
+            original_task = {
+                "id": task_id,
+                "question": f"Задача {task_id}",
+                "correct_answer": str(expected_answer),
+                "score": base_score,
+                "island": island_id or "unknown",
+                "operation_type": operation_type or "unknown"
             }
+            transfer_task = self._generate_transfer_task(original_task, user)
+        
+        # 🔹 Сообщение от персонажа
+        message = self._get_character_message(user, is_correct, rift_stage)
+        
+        # 🔹 Обновляем общую статистику
+        user["total_tasks_attempted"] = user.get("total_tasks_attempted", 0) + 1
+        if is_correct:
+            user["total_tasks_correct"] = user.get("total_tasks_correct", 0) + 1
+            if user["total_tasks_attempted"] > 0:
+                user["accuracy_overall"] = round(
+                    user["total_tasks_correct"] / user["total_tasks_attempted"] * 100, 1
+                )
+        
+        # 🔹 Обновляем уровень если нужно
+        level_up = self._check_level_progress(user_id, user)
+        
+        # 🔹 Сохраняем пользователя с новыми полями Хаоса
+        user["rift_stage"] = rift_stage
+        user["artifact_chaos_state"] = artifact_state
+        if is_transfer and is_correct:
+            user["transfer_tasks_completed"] = user.get("transfer_tasks_completed", 0) + 1
+        
+        self.storage.save_user(user_id, user)
+        
+        # 🔹 Логируем попытку для статистики (если есть метод)
+        try:
+            self.storage.log_task_attempt(
+                user_id=user_id,
+                task_id=task_id,
+                island_id=island_id or "unknown",
+                operation_type=operation_type or "unknown",
+                is_correct=is_correct,
+                time_taken=None,
+                answer_given=str(answer),
+                expected_answer=str(expected_answer),
+                chaos_energy=user["chaos_energy"],
+                rift_stage=rift_stage,
+                transfer_used=is_transfer
+            )
+        except AttributeError:
+            # Метод может ещё не существовать в старой версии storage.py
+            pass
+        
+        # 🔹 Возвращаем расширенный ответ для витрины
+        return {
+            "correct": is_correct,
+            "reward": reward,
+            "message": message,
+            "level_up": level_up,
+            "chaos_state": {
+                "rift_stage": rift_stage,
+                "chaos_energy": user["chaos_energy"],
+                "artifact_state": artifact_state,
+                "consecutive_errors": user["consecutive_errors"]
+            },
+            "transfer_task": transfer_task,
+            "new_balance": user.get("score_balance", 0),
+            "new_total_score": user.get("total_score", 0)
+        }
+    
+    # =============================================================================
+    # 🔥 СТАРЫЕ МЕТОДЫ (СОХРАНЕНЫ)
+    # =============================================================================
     
     def _get_task_reward(self, task_id: str, user: Dict) -> int:
         """Базовая награда за задачу"""
@@ -82,6 +331,7 @@ class ChislyandiaEngine:
     
     def _check_level_progress(self, user_id: str, user: Dict) -> bool:
         """Проверяет, завершён ли уровень"""
+        # 🔹 Заглушка — в реальности проверять прогресс острова
         return False
 
     def _ensure_bank_columns(self, conn: sqlite3.Connection):
@@ -320,7 +570,12 @@ class ChislyandiaEngine:
             "tasks_solved": user.get("tasks_solved", 0),
             "tasks_correct": user.get("tasks_correct", 0),
             "inventory": user.get("inventory", []),
-            "artifact_upgrades": user.get("artifact_upgrades", {})
+            "artifact_upgrades": user.get("artifact_upgrades", {}),
+            # 🔹 Chaos System поля для витрины
+            "chaos_energy": user.get("chaos_energy", 0),
+            "rift_stage": user.get("rift_stage", 0),
+            "artifact_chaos_state": user.get("artifact_chaos_state", "dormant"),
+            "consecutive_errors": user.get("consecutive_errors", 0)
         }
     
     def get_artifact_info(self, user_id: str) -> Dict[str, Any]:

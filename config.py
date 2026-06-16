@@ -1,6 +1,12 @@
 # config.py
 import os
 import re
+from pathlib import Path
+from dotenv import load_dotenv  # ← ДОБАВЛЕНО!
+
+# 🔹 ЗАГРУЖАЕМ .env СРАЗУ, ПЕРЕД ЧТЕНИЕМ ПЕРЕМЕННЫХ!
+BASE_DIR = Path(__file__).parent
+load_dotenv(BASE_DIR / ".env")  # ← ДОБАВЛЕНО!
 
 # Токен бота читается из переменных окружения.
 # НЕ храните секреты в коде. Установите BOT_TOKEN в системных переменных

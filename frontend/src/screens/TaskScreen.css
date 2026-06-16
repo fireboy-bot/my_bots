@@ -1,0 +1,216 @@
+:root {
+  --bg-1: #1e1b4b;
+  --bg-2: #312e81;
+  --bg-3: #4c1d95;
+  --accent-primary: #8b5cf6;
+  --accent-secondary: #22d3ee;
+  --accent-gold: #fbbf24;
+  --chaos-red: #ef4444;
+  --chaos-purple: #a855f7;
+  --panel-bg: rgba(255, 255, 255, 0.05);
+  --panel-border: rgba(255, 255, 255, 0.12);
+  --glow-soft: 0 0 20px rgba(139, 92, 246, 0.25);
+  --glow-cyan: 0 0 25px rgba(34, 211, 238, 0.4);
+  --glow-correct: 0 0 40px rgba(34, 197, 94, 0.8);
+}
+
+.task-screen {
+  display: grid;
+  grid-template-columns: 280px 1fr 280px;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: 
+    "stats  center settings"
+    "chaos  center nav"
+    "chaos  center nav";
+  gap: 16px;
+  padding: 16px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+  font-family: 'Nunito', system-ui, sans-serif;
+  color: #E2E8F0;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 🔹 БАЗОВЫЕ ПАНЕЛИ */
+.game-panel {
+  background: var(--panel-bg);
+  backdrop-filter: blur(14px);
+  border-radius: 20px;
+  border: 1px solid var(--panel-border);
+  box-shadow: inset 0 0 20px rgba(255,255,255,0.03), 0 10px 40px rgba(0,0,0,0.4);
+  transition: all 0.3s ease;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.game-stats { grid-area: stats; box-shadow: var(--glow-soft); display: flex; flex-direction: column; gap: 16px; }
+.game-settings { grid-area: settings; opacity: 0.85; display: flex; flex-direction: column; gap: 12px; }
+.game-chaos { grid-area: chaos; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+.game-nav { grid-area: nav; display: flex; flex-direction: column; gap: 12px; justify-content: flex-end; }
+
+/* 🔹 СТАТИСТИКА: ЦВЕТА */
+.stat-item { display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+.stat-icon { font-size: 1.5rem; }
+.stat-value { font-size: 1.25rem; font-weight: 700; transition: color 0.2s, text-shadow 0.2s; }
+.stat-label { font-size: 0.875rem; color: #94A3B8; }
+.stat-item:has(.stat-icon[data-type="coins"]) .stat-value { color: var(--accent-gold); text-shadow: 0 0 8px rgba(251,191,36,0.4); }
+.stat-item:has(.stat-icon[data-type="hearts"]) .stat-value { color: #ef4444; text-shadow: 0 0 8px rgba(239,68,68,0.4); }
+.stat-item:has(.stat-icon[data-type="level"]) .stat-value { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.5); }
+
+/* 🔹 ЦЕНТРАЛЬНАЯ КАРТОЧКА (СЦЕНА) */
+.game-center { grid-area: center; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; z-index: 2; }
+
+.task-card {
+  position: relative;
+  border-radius: 24px;
+  background: rgba(255,255,255,0.06);
+  padding: 28px;
+  width: 100%;
+  max-width: 600px;
+  text-align: center;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 0 40px rgba(139, 92, 246, 0.15), 0 20px 60px rgba(0,0,0,0.5);
+  animation: cardBreathe 4s ease-in-out infinite;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+  will-change: transform, box-shadow;
+}
+
+@keyframes cardBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.015); }
+}
+
+/* 🔹 ФОКУС НА КАРТОЧКЕ */
+.task-card.focused {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12), 0 0 60px rgba(139, 92, 246, 0.35), 0 20px 60px rgba(0,0,0,0.5);
+}
+
+/* 🔹 ВСПЫШКИ ОТВЕТА */
+.task-card.flash-correct {
+  animation: correctFlash 0.4s ease forwards;
+}
+@keyframes correctFlash {
+  0% { box-shadow: 0 0 0 rgba(34,197,94,0); }
+  40% { box-shadow: 0 0 50px var(--glow-correct); transform: scale(1.03); }
+  100% { box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 0 40px rgba(139, 92, 246, 0.15), 0 20px 60px rgba(0,0,0,0.5); transform: scale(1); }
+}
+
+.task-card.flash-error {
+  animation: errorShake 0.3s ease;
+}
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+.task-question { font-size: 2rem; font-weight: 800; margin: 0 0 24px 0; color: #f8fafc; line-height: 1.3; }
+
+/* 🔹 INPUT (ЖИВАЯ РЕАКЦИЯ) */
+.answer-input {
+  width: 100%;
+  padding: 16px;
+  font-size: 1.5rem;
+  background: rgba(15, 23, 42, 0.8);
+  border: 2px solid #334155;
+  border-radius: 12px;
+  color: white;
+  text-align: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 16px;
+}
+.answer-input:focus {
+  outline: none;
+  border-color: var(--accent-secondary);
+  transform: scale(1.02);
+  box-shadow: var(--glow-cyan);
+}
+.answer-input:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* 🔹 КНОПКА (СВЕТ + НАЖАТИЕ) */
+.btn-submit {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.btn-submit::after {
+  content: "";
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.4), transparent);
+  transition: left 0.6s ease;
+}
+.btn-submit:hover { transform: translateY(-2px); box-shadow: 0 0 25px rgba(139, 92, 246, 0.4); }
+.btn-submit:hover::after { left: 100%; }
+.btn-submit:active { transform: scale(0.96) translateY(0); box-shadow: none; }
+.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* 🔹 ОБРАТНАЯ СВЯЗЬ */
+.feedback { padding: 12px 16px; border-radius: 12px; font-weight: 600; text-align: center; margin-top: 12px; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.feedback--success { background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.4); }
+.feedback--error { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); }
+@keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+/* 🔹 АДАПТИВ */
+@media (max-width: 1024px) {
+  .task-screen { grid-template-columns: 1fr; grid-template-areas: "settings" "center" "stats" "chaos" "nav"; gap: 12px; padding: 12px; }
+  .game-stats, .game-settings, .game-chaos, .game-nav { display: none; }
+  .task-card { padding: 20px; max-width: 100%; }
+  .task-question { font-size: 1.5rem; }
+}
+
+.loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.loading-spinner { font-size: 3rem; animation: spin 2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* 🔹 КНОПКИ ПРАВОЙ ПАНЕЛИ (Настройки, Навигация, Меню) */
+.game-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: #E2E8F0;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.game-button:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.35);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.game-button:active {
+  transform: scale(0.96) translateY(0);
+  box-shadow: none;
+}
+
+.game-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

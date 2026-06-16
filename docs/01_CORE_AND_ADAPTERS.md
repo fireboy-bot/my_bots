@@ -617,7 +617,7 @@ async def test_decoration_balance():
 # 2. Вставь в Notepad++
 
 # 3. Сохрани как:
-#    Папка: C:\Users\Fireboy\Desktop\my_bots\docs\
+#    Папка: C:\Users\Fireboy\Dev\Projects\Chislyandia\docs\
 #    Имя файла: 01_CORE_ADAPTERS_ARTIFACTS.md
 #    Тип файла: All types (*.*)
 #    Кодировка: UTF-8

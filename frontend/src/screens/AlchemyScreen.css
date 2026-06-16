@@ -1,0 +1,196 @@
+/* ⚗️ ЭКРАН АЛХИМИИ */
+.alchemy-screen {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 20px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: transparent !important;
+  padding-bottom: 120px;
+}
+
+/* 🔹 ЗАГРУЗКА */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #94A3B8;
+  font-size: 16px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* 🔹 HEADER */
+.alchemy-screen__header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  padding-top: 10px;
+}
+
+.back-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 8px 16px;
+  color: #E2E8F0;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateX(-2px);
+}
+
+.alchemy-screen__header h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #E2E8F0;
+}
+
+/* 🔹 СООБЩЕНИЕ АЛХИМИКА */
+.alchemist-message {
+  background: rgba(74, 222, 128, 0.15);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.alchemist-message p {
+  margin: 0;
+  color: #E2E8F0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.alchemist-message p strong {
+  color: #4ADE80;
+}
+
+/* 🔹 СПИСОК АЛХИМИИ */
+.alchemy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.alchemy-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.alchemy-card.locked {
+  opacity: 0.6;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.alchemy-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.alchemy-icon {
+  font-size: 32px;
+}
+
+.alchemy-header strong {
+  color: #E2E8F0;
+  font-size: 16px;
+  display: block;
+}
+
+.alchemy-desc {
+  color: #94A3B8;
+  font-size: 13px;
+  margin: 0;
+}
+
+.alchemy-stats {
+  margin-bottom: 15px;
+}
+
+.alchemy-stats div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  color: #94A3B8;
+  font-size: 14px;
+}
+
+.alchemy-stats strong {
+  color: #E2E8F0;
+}
+
+.alchemy-stats strong.ok {
+  color: #4ADE80;
+}
+
+.alchemy-stats strong.locked {
+  color: #94A3B8;
+}
+
+.craft-btn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #EC4899, #DB2777);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.craft-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4);
+}
+
+.craft-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(236, 72, 153, 0.3);
+}
+
+/* 🔹 СООБЩЕНИЯ АЛХИМИИ */
+.alchemy-message {
+  background: rgba(74, 222, 128, 0.15) !important;
+  border-color: rgba(74, 222, 128, 0.4) !important;
+  color: #4ADE80 !important;
+  font-family: 'Courier New', monospace;
+}
+
+/* 🔹 ПОДСКАЗКА */
+.alchemy-tip {
+  background: rgba(74, 222, 128, 0.1);
+  border-left: 3px solid rgba(74, 222, 128, 0.4);
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  color: #94A3B8;
+  font-size: 13px;
+  margin: 20px 0;
+  font-style: italic;
+}
+
+.alchemy-tip i {
+  color: #E2E8F0;
+}
+
+/* 🔹 АДАПТИВ */
+@media (max-width: 480px) {
+  .alchemy-screen {
+    padding: 15px;
+  }
+}
