@@ -1,10 +1,11 @@
 # manyunya_bot.py
 """
 Основной файл запуска бота «Числяндия».
-Версия: 4.7 (Full Restore + run_polling Fix) 🟢🟣✅
+Версия: 4.8 (Telegram only + MAX комментирован) 🟢✅
 
 Фичи:
-- ✅ Поддержка ОБОИХ адаптеров одновременно (Telegram + VK/MAX)
+- ✅ Поддержка Telegram адаптера
+- ✅ MAX/VK закомментирован (требует юр. лица)
 - ✅ Чтение настроек из .env / .env.local
 - ✅ Инициализация адаптеров в post_init() с sys.stderr отладкой
 - ✅ ВСЕ оригинальные хендлеры восстановлены
@@ -70,9 +71,9 @@ from handlers.dev_bosses import (
 from handlers.universal_callback import universal_callback_handler
 from core.ui_helpers import get_persistent_keyboard
 
-# ✅ ИМПОРТ АДАПТЕРОВ ПЛАТФОРМ (мульти-платформа!)
+# ✅ ИМПОРТ АДАПТЕРОВ ПЛАТФОРМ
 from platforms.telegram_adapter import TelegramAdapter
-from platforms.max_adapter import MaxAdapter
+# from platforms.max_adapter import MaxAdapter  # ⏸️ MAX/VK закомментирован (требует юр. лица)
 
 # === НАСТРОЙКИ ЛОГИРОВАНИЯ ===
 setup_logging(BASE_DIR, os.getenv("LOG_LEVEL", "INFO"))
@@ -109,18 +110,18 @@ async def post_init(application: Application):
     debug_print("=" * 70)
     
     bot_token = os.getenv('BOT_TOKEN', '')
-    vk_token = os.getenv('VK_TOKEN', '')
-    vk_group = os.getenv('VK_GROUP_ID', '')
+    # vk_token = os.getenv('VK_TOKEN', '')  # ⏸️ MAX закомментирован
+    # vk_group = os.getenv('VK_GROUP_ID', '')  # ⏸️ MAX закомментирован
     
     debug_print(f"BOT_TOKEN: '{bot_token[:20]}...' (длина: {len(bot_token)})")
-    debug_print(f"VK_TOKEN: '{vk_token[:20]}...' (длина: {len(vk_token)})")
-    debug_print(f"VK_GROUP_ID: '{vk_group}'")
+    # debug_print(f"VK_TOKEN: '{vk_token[:20]}...' (длина: {len(vk_token)})")  # ⏸️ MAX
+    # debug_print(f"VK_GROUP_ID: '{vk_group}'")  # ⏸️ MAX
     
     tg_valid = bot_token and len(bot_token) > 30 and ':' in bot_token and not bot_token.startswith('#')
-    vk_valid = vk_token and vk_group and len(vk_token) > 20 and not vk_token.startswith('#')
+    # vk_valid = vk_token and vk_group and len(vk_token) > 20 and not vk_token.startswith('#')  # ⏸️ MAX
     
     debug_print(f"✅ Telegram токен валиден: {tg_valid}")
-    debug_print(f"✅ VK токен валиден: {vk_valid}")
+    # debug_print(f"✅ VK токен валиден: {vk_valid}")  # ⏸️ MAX
     debug_print("=" * 70 + "\n")
     # ================================
     
@@ -130,9 +131,9 @@ async def post_init(application: Application):
     
     logger.info(f"🔍 Проверка токенов...")
     logger.info(f"   bot_token длина: {len(bot_token)}")
-    logger.info(f"   vk_token длина: {len(vk_token)}")
+    # logger.info(f"   vk_token длина: {len(vk_token)}")  # ⏸️ MAX
     logger.info(f"   tg_valid: {tg_valid}")
-    logger.info(f"   vk_valid: {vk_valid}")
+    # logger.info(f"   vk_valid: {vk_valid}")  # ⏸️ MAX
     
     # 1. Telegram
     if tg_valid:
@@ -148,24 +149,24 @@ async def post_init(application: Application):
     else:
         debug_print(f"⚠️ Telegram токен не валиден (длина={len(bot_token)})")
     
-    # 2. MAX/VK
-    if vk_valid:
-        try:
-            debug_print("🔄 Инициализация MaxAdapter...")
-            vk_config = {
-                'vk_token': vk_token,
-                'vk_version': os.getenv('VK_API_VERSION', '5.131'),
-                'group_id': vk_group,
-            }
-            vk_adapter = MaxAdapter(vk_config)
-            adapters.append(vk_adapter)
-            debug_print("✅ MaxAdapter инициализирован")
-            logger.info("✅ MaxAdapter инициализирован")
-        except Exception as e:
-            debug_print(f"❌ Ошибка MaxAdapter: {e}")
-            logger.error(f"❌ Ошибка MaxAdapter: {e}", exc_info=True)
-    else:
-        debug_print(f"⚠️ VK настройки не валидны")
+    # # 2. MAX/VK (⏸️ ЗАКОММЕНТИРОВАН — требует юр. лица)
+    # if vk_valid:
+    #     try:
+    #         debug_print("🔄 Инициализация MaxAdapter...")
+    #         vk_config = {
+    #             'vk_token': vk_token,
+    #             'vk_version': os.getenv('VK_API_VERSION', '5.131'),
+    #             'group_id': vk_group,
+    #         }
+    #         vk_adapter = MaxAdapter(vk_config)
+    #         adapters.append(vk_adapter)
+    #         debug_print("✅ MaxAdapter инициализирован")
+    #         logger.info("✅ MaxAdapter инициализирован")
+    #     except Exception as e:
+    #         debug_print(f"❌ Ошибка MaxAdapter: {e}")
+    #         logger.error(f"❌ Ошибка MaxAdapter: {e}", exc_info=True)
+    # else:
+    #     debug_print(f"⚠️ VK настройки не валидны")
     
     # Проверка что хоть один адаптер есть
     if not adapters:
