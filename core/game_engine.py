@@ -6,9 +6,10 @@
 import logging
 import sqlite3
 import random
+import re
 from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime, timezone
-from database.storage import PlayerStorage
+from database.storage import PlayerStorage, get_db_path
 from core.score_manager import ScoreManager
 from core.castle_engine import CastleEngine
 
@@ -117,25 +118,32 @@ class ChislyandiaEngine:
     
         # 🔹 Перестановка для сложения (коммутативность)
         if island == "addition" and "+" in original_question:
-            parts = original_question.split("+")
-            if len(parts) == 2:
-                a = parts[0].strip().replace("=?", "").strip()
-                b = parts[1].strip().replace("=?", "").strip()
-                new_question = f"{b} + {a} = ?"
+            nums = re.findall(r'\d+', original_question)
+            if len(nums) >= 2:
+                a, b = nums[-2], nums[-1]
+                new_question = f"Сколько будет {b} + {a}?"
+            else:
+                parts = original_question.split("+")
+                if len(parts) == 2:
+                    a = parts[0].strip().replace("=?", "").strip()
+                    b = parts[1].strip().replace("=?", "").strip()
+                    new_question = f"{b} + {a} = ?"
+                else:
+                    new_question = original_question
             
-                options = self._generate_options(int(correct_answer), min_val=int(correct_answer)-20, max_val=int(correct_answer)+20)
+            options = self._generate_options(int(correct_answer), min_val=int(correct_answer)-20, max_val=int(correct_answer)+20)
             
-                return {
-                    "id": f"transfer_{original_task.get('id', 'unknown')}",
-                    "question": new_question,
-                    "options": options,
-                    "correct_answer": correct_answer,
-                    "score": max(5, base_score - 5),
-                    "island": island,
-                    "operation_type": operation_type,
-                    "is_transfer": True,
-                    "rift_closing": True
-                }
+            return {
+                "id": f"transfer_{original_task.get('id', 'unknown')}",
+                "question": new_question,
+                "options": options,
+                "correct_answer": correct_answer,
+                "score": max(5, base_score - 5),
+                "island": island,
+                "operation_type": operation_type,
+                "is_transfer": True,
+                "rift_closing": True
+            }
     
         # 🔹 ЗАЩИЩЁННАЯ заглушка для других типов
         return {
@@ -151,6 +159,17 @@ class ChislyandiaEngine:
             "hint": "Примени ту же идею, но иначе!"
         }
     
+    def _answers_match(self, answer: Any, expected_answer: Any) -> bool:
+        """Сравнивает ответы: строка или число с допуском (как в TG)."""
+        a = str(answer).strip().replace(',', '.')
+        e = str(expected_answer).strip().replace(',', '.')
+        if a == e:
+            return True
+        try:
+            return abs(float(a) - float(e)) < 0.01
+        except (ValueError, TypeError):
+            return False
+
     def _get_character_message(self, user: dict, is_correct: bool, rift_stage: int) -> str:
         """Возвращает сообщение от персонажа в зависимости от ситуации."""
         # 🔹 Владимир комментирует Разлом
@@ -192,8 +211,8 @@ class ChislyandiaEngine:
             "transfer_task": { ... } or None  # Если нужна задача-перенос
         }
         """
-        # 🔹 Базовая проверка ответа
-        is_correct = (str(answer).strip() == str(expected_answer).strip())
+        # 🔹 Базовая проверка ответа (как в handlers/levels.py — числовое сравнение)
+        is_correct = self._answers_match(answer, expected_answer)
         
         # 🔹 Получаем пользователя
         user = self.storage.get_user(user_id)
@@ -243,6 +262,11 @@ class ChislyandiaEngine:
                     reason="task_mistake",
                     context=task_id
                 )
+            # score_manager пишет в БД — подтягиваем актуальный баланс, иначе save_user ниже откатит
+            refreshed = self.storage.get_user(user_id)
+            if refreshed:
+                user["score_balance"] = refreshed.get("score_balance", user.get("score_balance", 0))
+                user["total_score"] = refreshed.get("total_score", user.get("total_score", 0))
         
         # 🔹 Генерируем задачу-перенос если нужна (ошибка + 2+ подряд + НЕ уже перенос)
         transfer_task = None
@@ -334,6 +358,10 @@ class ChislyandiaEngine:
         # 🔹 Заглушка — в реальности проверять прогресс острова
         return False
 
+    def _bank_conn(self) -> sqlite3.Connection:
+        """Соединение с той же БД, что и storage (не хардкод пути)."""
+        return sqlite3.connect(get_db_path())
+
     def _ensure_bank_columns(self, conn: sqlite3.Connection):
         """Гарантирует наличие банковских колонок в users."""
         c = conn.cursor()
@@ -423,7 +451,7 @@ class ChislyandiaEngine:
         ✅ ЧИТАЕТ БАНКОВСКИЕ ПОЛЯ НАПРЯМУЮ ИЗ БАЗЫ (минуя кэш!)
         """
         # ✅ Прямое чтение банковских полей из базы
-        conn = sqlite3.connect("data/progress.db")
+        conn = self._bank_conn()
         c = conn.cursor()
         self._ensure_bank_columns(conn)
         self._apply_bank_interest(conn, user_id)
@@ -476,7 +504,7 @@ class ChislyandiaEngine:
             return (False, message)
         
         # ✅ ПРЯМО ОБНОВЛЯЕМ bank_balance В БАЗЕ!
-        conn = sqlite3.connect("data/progress.db")
+        conn = self._bank_conn()
         c = conn.cursor()
         self._ensure_bank_columns(conn)
         self._apply_bank_interest(conn, user_id)
@@ -506,7 +534,7 @@ class ChislyandiaEngine:
         Забрать вклад с процентами.
         ✅ ПРЯМОЕ ОБНОВЛЕНИЕ БАЗЫ + кортеж (bool, str, int)
         """
-        conn = sqlite3.connect("data/progress.db")
+        conn = self._bank_conn()
         c = conn.cursor()
         self._ensure_bank_columns(conn)
         self._apply_bank_interest(conn, user_id)
@@ -554,6 +582,21 @@ class ChislyandiaEngine:
     def pay_castle_upkeep(self, user_id: str, days: int = 1) -> Tuple[bool, str]:
         """Оплатить содержание замка"""
         return self.castle.pay_upkeep(user_id, days)
+
+    def get_random_task(self, user_id: str, world: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Выдать случайную задачу — единый источник data/worlds/ (как TG)."""
+        from core.task_loader import pick_task_for_user
+        return pick_task_for_user(self.storage, user_id, world)
+
+    def resolve_task_answer(
+        self,
+        task_id: str,
+        island_id: Optional[str] = None,
+        client_expected: Any = None,
+    ) -> Optional[str]:
+        """Правильный ответ по task_id — ядро, не web."""
+        from core.task_loader import resolve_expected_answer
+        return resolve_expected_answer(task_id, island_id, client_expected)
     
     def get_player_profile(self, user_id: str) -> Dict[str, Any]:
         """Получает профиль игрока"""
@@ -571,6 +614,9 @@ class ChislyandiaEngine:
             "tasks_correct": user.get("tasks_correct", 0),
             "inventory": user.get("inventory", []),
             "artifact_upgrades": user.get("artifact_upgrades", {}),
+            "defeated_bosses": user.get("defeated_bosses", []),
+            "unlocked_zones": user.get("unlocked_zones", ["addition"]),
+            "completed_normal_game": user.get("completed_normal_game", False),
             # 🔹 Chaos System поля для витрины
             "chaos_energy": user.get("chaos_energy", 0),
             "rift_stage": user.get("rift_stage", 0),
@@ -585,3 +631,14 @@ class ChislyandiaEngine:
     def upgrade_artifact(self, user_id: str, artifact_id: str) -> Tuple[bool, str]:
         """Улучшить артефакт"""
         return self.score_manager.artifact_manager.upgrade_artifact(user_id, artifact_id)
+
+    def craft_alchemy(self, user_id: str, item_id: str) -> Dict[str, Any]:
+        """Создать алхимический предмет — та же логика, что в Telegram."""
+        from handlers.alchemy import craft_alchemy_item, get_alchemy_activation_message
+
+        success, message = craft_alchemy_item(user_id, item_id, self.storage, self.score_manager)
+        return {
+            "success": success,
+            "message": message,
+            "activation": get_alchemy_activation_message(item_id) if success else None,
+        }

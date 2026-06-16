@@ -140,8 +140,9 @@ class ScoreManager:
         Returns:
             int: Фактический штраф (с учётом артефактов)
         """
-        # ✅ Применяем снижение от Артефакта Силы
-        final_penalty = self.artifact_manager.apply_penalty_reduction(user_id, base_penalty)
+        # artifact_manager возвращает отрицательное только при активном артефакте
+        raw_penalty = self.artifact_manager.apply_penalty_reduction(user_id, abs(base_penalty))
+        final_penalty = raw_penalty if raw_penalty <= 0 else -abs(raw_penalty)
         
         user = self.storage.get_user(user_id)
         if not user:

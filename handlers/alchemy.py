@@ -146,8 +146,13 @@ async def show_alchemy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def execute_craft(user_id: int, item_id: str, storage, score_manager=None) -> tuple:
-    """Выполняет создание артефакта."""
+async def execute_craft(user_id, item_id: str, storage, score_manager=None) -> tuple:
+    """Выполняет создание артефакта (async-обёртка для Telegram)."""
+    return craft_alchemy_item(user_id, item_id, storage, score_manager)
+
+
+def craft_alchemy_item(user_id, item_id: str, storage, score_manager=None) -> tuple:
+    """Синхронный крафт — для web/API и ядра."""
     progress = storage.get_user(user_id) or {}
     inventory = progress.get("inventory", [])
     
@@ -164,7 +169,7 @@ async def execute_craft(user_id: int, item_id: str, storage, score_manager=None)
         return False, "❌ Предмет не найден!"
     
     item_data = all_items[item_id]
-    cost_in_score = item_data.get("cost_in_score")
+    cost_in_score = item_data.get("cost_in_score", ALCHEMY_RECIPES[item_id]["cost_in_score"])
     item_type = item_data.get("type", "one_time_risk")
     
     if current_balance < cost_in_score:
@@ -176,9 +181,8 @@ async def execute_craft(user_id: int, item_id: str, storage, score_manager=None)
     if item_id not in get_available_recipes(progress):
         return False, "❌ Рецепт ещё не открыт!"
     
-    # ✅ ИСПРАВЛЕНО: spend_score НЕ async — убираем await!
     if score_manager:
-        success, message = score_manager.spend_score(  # ← БЕЗ await!
+        success, message = score_manager.spend_score(
             user_id=user_id,
             amount=cost_in_score,
             reason="alchemy_craft",
@@ -186,12 +190,11 @@ async def execute_craft(user_id: int, item_id: str, storage, score_manager=None)
         )
         if not success:
             return False, message
-        progress["score_balance"] = max(0, progress.get("score_balance", 0) - cost_in_score)
+        progress = storage.get_user(user_id) or progress
     else:
-        if current_balance < cost_in_score:
-            return False, "❌ Недостаточно золотых!"
         progress["score_balance"] = current_balance - cost_in_score
     
+    inventory = progress.get("inventory", [])
     if item_id not in inventory:
         inventory.append(item_id)
         progress["inventory"] = inventory

@@ -47,7 +47,7 @@ class CastleEngine:
         
         # Получаем данные замка
         castle_data = user.get("castle_data", {})
-        upkeep_paid_until = castle_data.get("upkeep_paid_until", 0)
+        upkeep_paid_until = castle_data.get("upkeep_paid_until", 0) or 0
         
         # ✅ КОНВЕРТИРУЕМ СТРОКУ В FLOAT (если это строка)
         if isinstance(upkeep_paid_until, str):

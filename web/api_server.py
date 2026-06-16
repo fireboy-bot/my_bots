@@ -14,7 +14,6 @@ import json
 import os
 import sys
 import logging
-import random
 from datetime import datetime, timezone
 
 # 🔹 Добавляем корень проекта в path
@@ -62,106 +61,7 @@ logger.info("[INIT] WebAdapter ready! Core initialized.")
 
 
 # =============================================================================
-# 🔹 ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (только для загрузки задач из файла)
-# =============================================================================
-
-def _get_mock_tasks(world=None):
-    """Заглушки задач — если файл не найден или пустой"""
-    mock = [
-        {"id": "mock_add_1", "question": "5 + 3 = ?", "options": ["6", "7", "8", "9"], 
-         "correct_answer": "8", "score": 10, "world": "addition", "island": "addition", "operation_type": "2digit_add"},
-        {"id": "mock_mult_1", "question": "7 × 6 = ?", "options": ["36", "42", "48", "54"], 
-         "correct_answer": "42", "score": 15, "world": "multiplication", "island": "multiplication", "operation_type": "1digit_mult"},
-    ]
-    return [t for t in mock if not world or t.get('world') == world] if world else mock
-
-
-def load_tasks_from_file(world=None):
-    """
-    Загружает задачи из data/tasks.json.
-    Поддерживает формат: { "addition": { "tasks": [ {...} ] } }
-    Возвращает список нормализованных задач.
-    """
-    tasks_file = os.path.join(BASE_DIR, "data", "tasks.json")
-    
-    if not os.path.exists(tasks_file):
-        logger.warning(f"[WARN] {tasks_file} not found, using mock")
-        return _get_mock_tasks(world)
-    
-    try:
-        with open(tasks_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        tasks = []
-        
-        # 🔹 Ожидаем: { "world_name": { "tasks": [...] } }
-        if isinstance(data, dict):
-            for world_name, world_data in data.items():
-                if isinstance(world_data, dict) and 'tasks' in world_data:
-                    raw_tasks = world_data['tasks']
-                    if isinstance(raw_tasks, list):
-                        for idx, task in enumerate(raw_tasks):
-                            if not isinstance(task, dict):
-                                continue
-                            
-                            # 🔹 Получаем правильный ответ
-                            correct = task.get('correct_answer') or task.get('answer')
-                            if correct is None:
-                                continue
-                            correct_str = str(correct).strip()
-                            
-                            # 🔹 Генерируем варианты если нет
-                            options = task.get('options')
-                            if not options or not isinstance(options, list):
-                                try:
-                                    c = int(correct_str)
-                                    opts = {correct_str}
-                                    for off in [-10, -5, -3, 3, 5, 10]:
-                                        w = str(c + off)
-                                        if w != correct_str:
-                                            opts.add(w)
-                                        if len(opts) >= 4:
-                                            break
-                                    options = list(opts)
-                                    random.shuffle(options)
-                                except:
-                                    options = [correct_str] * 4
-                            
-                            # 🔹 Определяем тип операции
-                            q = task.get('question', '').lower()
-                            if '×' in q or '*' in q or 'умнож' in q:
-                                op = '1digit_mult'
-                            elif '÷' in q or '/' in q or 'дел' in q:
-                                op = '2digit_div'
-                            elif '-' in q or 'вычит' in q:
-                                op = '2digit_sub'
-                            else:
-                                op = '2digit_add'
-                            
-                            tasks.append({
-                                "id": task.get('id') or f"{world_name}_{idx}",
-                                "question": task.get('question', ''),
-                                "correct_answer": correct_str,
-                                "options": options,
-                                "score": 10,
-                                "world": world_name,
-                                "island": world_name,
-                                "operation_type": op
-                            })
-        
-        # 🔹 Фильтр по world
-        if world:
-            tasks = [t for t in tasks if t.get('world') == world or t.get('island') == world]
-        
-        return tasks if tasks else _get_mock_tasks(world)
-        
-    except Exception as e:
-        logger.error(f"[ERROR] load_tasks_from_file: {e}")
-        return _get_mock_tasks(world)
-
-
-# =============================================================================
-# 🔹 ЭНДПОИНТЫ (ПРОСТАЯ ТРАНСЛЯЦИЯ: запрос → ядро → ответ)
+# 🔹 ЭНДПОИНТЫ — только прокси к ядру
 # =============================================================================
 
 # 🔹 HEALTH (без изменений)
@@ -186,7 +86,7 @@ def get_player_profile(user_id):
 # 🔹 ЗАДАЧА — без изменений
 @app.route('/api/game/task')
 def get_task():
-    """[GET] Получить задачу — загружаем из файла или ядра"""
+    """[GET] Задача — ядро читает data/worlds/ (как Telegram)."""
     try:
         user_id = request.args.get('user_id')
         world = request.args.get('world')
@@ -194,11 +94,11 @@ def get_task():
         if not user_id:
             return jsonify({"error": "user_id required"}), 400
         
-        tasks = load_tasks_from_file(world)
-        if not tasks:
+        task = engine.get_random_task(user_id, world)
+        if not task:
             return jsonify({"error": "No tasks available"}), 404
         
-        return jsonify(random.choice(tasks))
+        return jsonify(task)
         
     except Exception as e:
         logger.error(f"[ERROR] get_task: {e}")
@@ -226,23 +126,34 @@ def check_answer():
         expected_answer = data.get('expected_answer')
         island_id = data.get('island_id')
         operation_type = data.get('operation_type')
+        is_transfer = bool(data.get('is_transfer', False))
         
         # 🔹 Валидация
-        if not all([user_id, answer is not None, task_id, expected_answer is not None]):
-            return jsonify({"error": "Missing required fields: user_id, answer, task_id, expected_answer"}), 400
+        if not all([user_id, answer is not None, task_id]):
+            return jsonify({"error": "Missing required fields: user_id, answer, task_id"}), 400
         
-        # 🔹 Приводим к строке для надёжного сравнения (solve_task делает str() внутри)
+        # 🔹 Правильный ответ — из tasks.json по task_id (не доверяем фронту)
+        resolved_expected = engine.resolve_task_answer(task_id, island_id, expected_answer)
+        if resolved_expected is None:
+            return jsonify({"error": "Could not resolve expected answer for task"}), 400
+        
+        # 🔹 Приводим ответ игрока к строке
         answer_str = str(answer).strip().replace(',', '.')
-        expected_str = str(expected_answer).strip().replace(',', '.')
         
         # 🔹 ВЫЗЫВАЕМ ЯДРО — вся логика там!
         result = engine.solve_task(
             user_id=str(user_id),
             answer=answer_str,
             task_id=str(task_id),
-            expected_answer=expected_str,
+            expected_answer=resolved_expected,
             island_id=island_id,
-            operation_type=operation_type
+            operation_type=operation_type,
+            is_transfer=is_transfer
+        )
+        
+        logger.info(
+            f"[ANSWER] user={user_id} task={task_id} given={answer_str} "
+            f"expected={resolved_expected} correct={result.get('correct')}"
         )
         
         return jsonify(result)
@@ -347,6 +258,23 @@ def upgrade_artifact(user_id):
         return jsonify({"success": success, "message": message})
     except Exception as e:
         logger.error(f"[ERROR] upgrade_artifact: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+# 🔹 АЛХИМИЯ — прокси к ядру (handlers/alchemy.py)
+@app.route('/api/alchemy/<user_id>/craft', methods=['POST'])
+def craft_alchemy(user_id):
+    """[POST] Создать зелье/артефакт в Лавке Безумца"""
+    try:
+        item_id = (request.get_json(silent=True) or {}).get('item_id')
+        if not item_id:
+            return jsonify({"success": False, "message": "item_id required"}), 400
+
+        result = engine.craft_alchemy(user_id, item_id)
+        logger.info(f"[ALCHEMY] user={user_id} item={item_id} success={result.get('success')}")
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[ERROR] craft_alchemy: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 

@@ -5,6 +5,13 @@ import { CharacterCard } from '../components/CharacterCard';
 import { botApi } from '../adapters/botAdapter';
 import './ArtifactsScreen.css';
 
+function getArtifactLevel(upgrades, artifactId) {
+  const value = upgrades?.[artifactId];
+  if (typeof value === 'number') return value;
+  if (value && typeof value === 'object') return value.level || 0;
+  return 0;
+}
+
 // 🔹 Конфиг артефактов (синхронизируй с items.py)
 const ARTIFACTS_CONFIG = {
   artifact_luck: {
@@ -74,7 +81,7 @@ export function ArtifactsScreen({ userId = "331113480", onBack }) {
   const handleUpgrade = async (artifactId) => {
     if (processing) return;
     const artifact = ARTIFACTS_CONFIG[artifactId];
-    const level = artifacts[artifactId]?.level || 0;
+    const level = getArtifactLevel(artifacts, artifactId);
     
     // 🔹 Правильная проверка: замок открыт И upkeep оплачен
     const isCastleUnlocked = playerStats?.defeated_bosses?.includes('final_boss') || 
@@ -102,11 +109,13 @@ export function ArtifactsScreen({ userId = "331113480", onBack }) {
     
     setProcessing(true);
     try {
-      const result = await botApi.upgradeArtifact?.(userId, artifactId) || { success: true, message: `✅ ${artifact.name} улучшен!` };
+      const result = await botApi.upgradeArtifact(userId, artifactId);
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
         const profile = await botApi.getPlayerProfile(userId);
+        const castle = await botApi.getCastleInfo(userId);
         setPlayerStats(profile);
+        setCastleInfo(castle);
         setArtifacts(profile?.artifact_upgrades || {});
       } else {
         setMessage({ type: 'error', text: result.message });
@@ -163,7 +172,7 @@ export function ArtifactsScreen({ userId = "331113480", onBack }) {
       {/* 🔹 СПИСОК АРТЕФАКТОВ */}
       <div className="artifacts-list">
         {Object.values(ARTIFACTS_CONFIG).map(artifact => {
-          const level = artifacts[artifact.id]?.level || 0;
+          const level = getArtifactLevel(artifacts, artifact.id);
           const price = level === 0 ? artifact.base_price : Math.floor(artifact.base_price * Math.pow(artifact.cost_multiplier, level));
           const bonus = Math.min(artifact.base_value + (artifact.per_level * level), artifact.max_value);
           const canAfford = balance >= price;
@@ -201,7 +210,7 @@ export function ArtifactsScreen({ userId = "331113480", onBack }) {
 
       {message && <div className={`message message--${message.type}`}>{message.text}</div>}
       
-      <FloatingNav userId={userId} showBack={true} showMenu={true} onBack={handleBack} theme="game" />
+      <FloatingNav userId={userId} showBack={true} showMenu={true} showSettings={false} onBack={handleBack} theme="game" />
     </div>
   );
 }

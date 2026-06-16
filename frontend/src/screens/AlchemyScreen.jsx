@@ -94,7 +94,7 @@ export function AlchemyScreen({ userId = "331113480", onBack }) {
     
     setProcessing(true);
     try {
-      const result = await botApi.craftAlchemy?.(userId, itemId) || { success: true, message: `✨ Создано: ${item.name}!` };
+      const result = await botApi.craftAlchemy(userId, itemId);
       if (result.success) {
         setMessage({ type: 'success', text: result.message + (result.activation ? `\n\n${result.activation}` : '') });
         const profile = await botApi.getPlayerProfile(userId);
@@ -105,7 +105,7 @@ export function AlchemyScreen({ userId = "331113480", onBack }) {
       }
     } catch (e) {
       console.error('❌ Error:', e);
-      setMessage({ type: 'error', text: '⚠️ Ошибка' });
+      setMessage({ type: 'error', text: '⚠️ API недоступен. Перезапусти web/api_server.py' });
     }
     setProcessing(false);
     setTimeout(() => setMessage(null), 5000);
@@ -180,7 +180,7 @@ export function AlchemyScreen({ userId = "331113480", onBack }) {
 
       {message && <div className={`message message--${message.type} alchemy-message`}>{message.text}</div>}
       
-      <FloatingNav userId={userId} showBack={true} showMenu={true} onBack={handleBack} theme="game" />
+      <FloatingNav userId={userId} showBack={true} showMenu={true} showSettings={false} onBack={handleBack} theme="game" />
     </div>
   );
 }

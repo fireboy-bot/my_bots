@@ -3,7 +3,7 @@
  * Все запросы к бэкенду — через этот файл
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
 
 // 🔹 Вспомогательная функция для запросов
 async function apiFetch(endpoint, options = {}) {
@@ -82,26 +82,18 @@ export const botApi = {
 
   // 🔹 Проверить ответ — ИСПРАВЛЕНО: возвращаем объект, не строку!
   async checkAnswer(data) {
-    try {
-      return await apiFetch('/api/game/check_answer', {
-        method: 'POST',
-        body: JSON.stringify({
-          user_id: data.user_id?.toString(),      // 🔹 Гарантируем строку
-          answer: data.answer?.toString(),         // 🔹 Гарантируем строку
-          task_id: data.task_id?.toString(),       // 🔹 Гарантируем строку
-          expected_answer: data.expected_answer?.toString(), // 🔹 Гарантируем строку
-          island_id: data.island_id,
-          operation_type: data.operation_type,
-          is_transfer: data.is_transfer || false,
-        }),
-      });
-    } catch (error) {
-      console.warn('⚠️ Using mock answer check');
-      // 🔹 Возвращаем ОБЪЕКТ, не строку!
-      return data.answer?.toString() === data.expected_answer?.toString()
-        ? { ...MOCK_ANSWERS.success, new_balance: (data.currentBalance || 0) + 10 }
-        : { ...MOCK_ANSWERS.error, new_balance: Math.max(0, (data.currentBalance || 100) - 5) };
-    }
+    return await apiFetch('/api/game/check_answer', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: data.user_id?.toString(),
+        answer: data.answer?.toString(),
+        task_id: data.task_id?.toString(),
+        expected_answer: data.expected_answer?.toString(),
+        island_id: data.island_id,
+        operation_type: data.operation_type,
+        is_transfer: data.is_transfer || false,
+      }),
+    });
   },
 
   // 🔹 Профиль игрока
@@ -146,7 +138,7 @@ export const botApi = {
       });
     } catch (error) {
       console.warn('⚠️ Using mock deposit');
-      return { success: true, message: `✅ Mock: положено ${amount}` };
+      return { success: false, message: '⚠️ API недоступен. Запусти web/api_server.py' };
     }
   },
 
@@ -155,7 +147,7 @@ export const botApi = {
       return await apiFetch(`/api/bank/${encodeURIComponent(userId)}/withdraw`, { method: 'POST' });
     } catch (error) {
       console.warn('⚠️ Using mock withdraw');
-      return { success: true, message: '✅ Mock: забрано 100', total: 100 };
+      return { success: false, message: '⚠️ API недоступен. Запусти web/api_server.py', total: 0 };
     }
   },
 
@@ -177,7 +169,7 @@ export const botApi = {
       });
     } catch (error) {
       console.warn('⚠️ Using mock upkeep');
-      return { success: true, message: `✅ Mock: upkeep оплачен на ${days} дн.` };
+      return { success: false, message: '⚠️ API недоступен. Запусти web/api_server.py' };
     }
   },
 
@@ -189,8 +181,13 @@ export const botApi = {
       });
     } catch (error) {
       console.warn('⚠️ Using mock upgrade');
-      return { success: true, message: '✅ Mock: декорация улучшена', new_level: 1, new_bonus: 0.02 };
+      return { success: false, message: '⚠️ API недоступен. Запусти web/api_server.py' };
     }
+  },
+
+  /** @deprecated используй upgradeDecoration */
+  upgradeCastleDecoration(userId, decorationId) {
+    return this.upgradeDecoration(userId, decorationId);
   },
 
   // 🔹 Артефакты
@@ -211,7 +208,14 @@ export const botApi = {
       });
     } catch (error) {
       console.warn('⚠️ Using mock upgrade');
-      return { success: true, message: '✅ Mock: артефакт улучшен' };
+      return { success: false, message: '⚠️ API недоступен. Запусти web/api_server.py' };
     }
+  },
+
+  async craftAlchemy(userId, itemId) {
+    return await apiFetch(`/api/alchemy/${encodeURIComponent(userId)}/craft`, {
+      method: 'POST',
+      body: JSON.stringify({ item_id: itemId }),
+    });
   },
 };

@@ -27,6 +27,10 @@ export function BankScreen({ userId = "331113480", onBack }) {
         
         setBankInfo(bank);
         setPlayerStats(profile);
+
+        if (bank?.error || profile?.error) {
+          setMessage({ type: 'error', text: bank?.error || profile?.error || '⚠️ Игрок не найден' });
+        }
         
         // 🔹 Фраза Владимира
         setVladimirPhrase(getVladimirPhrase(bank, profile));

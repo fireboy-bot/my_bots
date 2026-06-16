@@ -129,6 +129,7 @@ class PlayerStorage:
         logger.info(f"✅ PlayerStorage инициализирован (conn_id={id(self.conn)})")
         
         self._ensure_player_profile_column()
+        self._ensure_castle_data_column()
         self._ensure_first_time_column()
         self._ensure_chaos_columns()
         self._ensure_difficulty_columns()
@@ -160,6 +161,18 @@ class PlayerStorage:
             cursor.execute("ALTER TABLE users ADD COLUMN player_profile TEXT")
             self.conn.commit()
             logger.info("✅ Колонка player_profile добавлена!")
+    
+    def _ensure_castle_data_column(self):
+        """Добавляет колонку castle_data если её нет."""
+        cursor = self.conn.cursor()
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        if 'castle_data' not in columns:
+            logger.info("🔧 Добавляем колонку castle_data...")
+            cursor.execute("ALTER TABLE users ADD COLUMN castle_data TEXT DEFAULT '{}'")
+            self.conn.commit()
+            logger.info("✅ Колонка castle_data добавлена!")
     
     # 🔹 НОВЫЕ МЕТОДЫ: добавляем "крючки" для будущего
     

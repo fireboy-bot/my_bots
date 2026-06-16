@@ -139,10 +139,7 @@ export function CastleScreen({ userId = "331113480", onBack }) {
     try {
       // 🔹 В реальном боте: engine.castle.upgrade_decoration()
       // Здесь — имитация через botApi (добавь эндпоинт в Flask если нужно)
-      const result = await botApi.upgradeCastleDecoration?.(userId, decoration.id) || {
-        success: true,
-        message: `✅ ${decoration.emoji} ${decoration.name} улучшен до уровня ${currentLevel + 1}!`
-      };
+      const result = await botApi.upgradeDecoration(userId, decoration.id);
       
       if (result.success) {
         setMessage({ type: 'success', text: result.message });

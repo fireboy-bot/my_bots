@@ -1,0 +1,19 @@
+[Unit]
+Description=Chislyandia Web API (Gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=juliabot
+Group=juliabot
+WorkingDirectory=/opt/chislyandia
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONIOENCODING=utf-8
+Environment=APP_ENV=production
+ExecStart=/opt/chislyandia/venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 --timeout 120 web.api_server:app
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
