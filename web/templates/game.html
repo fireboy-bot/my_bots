@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮 Числяндия — Игра</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* Анимированные пузырьки на фоне */
+        .bubble {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            animation: float 15s infinite;
+        }
+        
+        .bubble:nth-child(1) { width: 80px; height: 80px; left: 10%; animation-delay: 0s; }
+        .bubble:nth-child(2) { width: 60px; height: 60px; left: 20%; animation-delay: 2s; }
+        .bubble:nth-child(3) { width: 100px; height: 100px; left: 30%; animation-delay: 4s; }
+        .bubble:nth-child(4) { width: 70px; height: 70px; left: 50%; animation-delay: 1s; }
+        .bubble:nth-child(5) { width: 90px; height: 90px; left: 70%; animation-delay: 3s; }
+        .bubble:nth-child(6) { width: 50px; height: 50px; left: 80%; animation-delay: 5s; }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(100vh) scale(1); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100px) scale(1.2); opacity: 0; }
+        }
+        
+        .game-container {
+            background: linear-gradient(145deg, #ffffff, #f0f4ff);
+            border-radius: 30px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 
+                0 20px 60px rgba(0,0,0,0.3),
+                0 0 0 10px rgba(255,255,255,0.1),
+                inset 0 0 60px rgba(102, 126, 234, 0.1);
+            position: relative;
+            z-index: 10;
+            border: 5px solid rgba(255,255,255,0.3);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            background: linear-gradient(135deg, #FF6B9D, #FFD93D, #6BCF7F, #667eea);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 42px;
+            font-weight: 900;
+            margin-bottom: 10px;
+            animation: gradient 5s ease infinite;
+            text-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        @keyframes gradient {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        .subtitle {
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 700;
+            opacity: 0.8;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-box {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 20px;
+            text-align: center;
+            flex: 1;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-box::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.2), transparent);
+            transform: rotate(45deg);
+            animation: shimmer 3s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) rotate(45deg); }
+        }
+        
+        .stat-box:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 12px 30px rgba(102, 126, 234, 0.6);
+        }
+        
+        .stat-label {
+            font-size: 13px;
+            opacity: 0.9;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 900;
+            margin-top: 8px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .task-container {
+            background: linear-gradient(135deg, #fff9e6, #fff);
+            border-radius: 25px;
+            padding: 40px 30px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 4px solid #FFD93D;
+            box-shadow: 
+                0 10px 30px rgba(255, 217, 61, 0.3),
+                inset 0 0 30px rgba(255, 217, 61, 0.1);
+            position: relative;
+        }
+        
+        .task-container::before {
+            content: '🌟';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 40px;
+            animation: spin 10s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: translateX(-50%) rotate(0deg); }
+            to { transform: translateX(-50%) rotate(360deg); }
+        }
+        
+        .task {
+            font-size: 56px;
+            color: #667eea;
+            font-weight: 900;
+            margin-bottom: 25px;
+            text-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .answer-input {
+            width: 100%;
+            padding: 20px;
+            font-size: 32px;
+            border: 4px solid #667eea;
+            border-radius: 15px;
+            text-align: center;
+            outline: none;
+            transition: all 0.3s;
+            font-weight: 700;
+            background: white;
+            font-family: 'Nunito', sans-serif;
+        }
+        
+        .answer-input:focus {
+            border-color: #FF6B9D;
+            box-shadow: 0 0 0 4px rgba(255, 107, 157, 0.3);
+            transform: scale(1.02);
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 20px;
+            font-size: 24px;
+            background: linear-gradient(135deg, #6BCF7F, #4ECDC4);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            margin-top: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 8px 20px rgba(107, 207, 127, 0.4);
+            font-family: 'Nunito', sans-serif;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 12px 30px rgba(107, 207, 127, 0.6);
+        }
+        
+        .submit-btn:active {
+            transform: translateY(0) scale(0.98);
+        }
+        
+        .result {
+            text-align: center;
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 22px;
+            font-weight: 900;
+            display: none;
+            animation: popIn 0.5s ease-out;
+        }
+        
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .result.correct {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+            display: block;
+            border: 3px solid #6BCF7F;
+            box-shadow: 0 5px 20px rgba(107, 207, 127, 0.4);
+        }
+        
+        .result.incorrect {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+            display: block;
+            border: 3px solid #FF6B9D;
+            box-shadow: 0 5px 20px rgba(255, 107, 157, 0.4);
+        }
+        
+        .back-link {
+            text-align: center;
+            margin-top: 25px;
+        }
+        
+        .back-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 16px;
+            transition: all 0.3s;
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 2px solid #667eea;
+        }
+        
+        .back-link a:hover {
+            background: #667eea;
+            color: white;
+            transform: translateX(-5px);
+        }
+        
+        /* Конфетти для правильного ответа */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #FFD93D;
+            animation: confetti-fall 3s linear forwards;
+        }
+        
+        @keyframes confetti-fall {
+            0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(500px) rotate(720deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Пузырьки на фоне -->
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    
+    <div class="game-container">
+        <div class="header">
+            <h1>🎮 ЧИСЛЯНДИЯ</h1>
+            <p class="subtitle">Волшебное приключение в мире чисел!</p>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-label">🏆 Уровень</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">💰 Очки</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+        </div>
+        
+        <div class="task-container">
+            <div class="task" id="task">{{ task.question }}</div>
+            <input type="number" class="answer-input" id="answer" placeholder="?" autofocus>
+            <button class="submit-btn" onclick="submitAnswer()">✨ Ответить! ✨</button>
+        </div>
+        
+        <div class="result" id="result"></div>
+        
+        <div class="back-link">
+            <a href="/profile/{{ user_id }}">← На профиль</a>
+        </div>
+    </div>
+    
+    <script>
+        // Загрузка прогресса
+        async function loadProgress() {
+            const response = await fetch('/game/progress/{{ user_id }}');
+            const data = await response.json();
+            document.getElementById('level').textContent = data.level;
+            document.getElementById('score').textContent = data.total_score;
+        }
+        
+        // Отправка ответа
+        async function submitAnswer() {
+            const answerInput = document.getElementById('answer');
+            const resultDiv = document.getElementById('result');
+            const answer = answerInput.value;
+            
+            if (!answer) {
+                resultDiv.className = 'result incorrect';
+                resultDiv.textContent = '⚠️ Введи ответ!';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/game/answer', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({answer: answer})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.correct) {
+                        resultDiv.className = 'result correct';
+                        resultDiv.textContent = `✅ Правильно! +${data.score_change} очков! 🎉`;
+                        
+                        // Обновляем статистику с анимацией
+                        animateValue('score', parseInt(document.getElementById('score').textContent), data.total_score, 1000);
+                        
+                        // Конфетти!
+                        createConfetti();
+                        
+                        // Показываем следующую задачу через 1.5 секунды
+                        setTimeout(() => {
+                            if (data.next_task) {
+                                document.getElementById('task').textContent = data.next_task.question;
+                                answerInput.value = '';
+                                resultDiv.className = 'result';
+                                resultDiv.textContent = '';
+                                answerInput.focus();
+                            }
+                        }, 1500);
+                    } else {
+                        resultDiv.className = 'result incorrect';
+                        resultDiv.textContent = '❌ Попробуй ещё раз! 💪';
+                    }
+                } else {
+                    resultDiv.className = 'result incorrect';
+                    resultDiv.textContent = '⚠️ Ошибка: ' + data.error;
+                }
+            } catch (error) {
+                resultDiv.className = 'result incorrect';
+                resultDiv.textContent = '⚠️ Ошибка соединения';
+                console.error(error);
+            }
+        }
+        
+        // Анимация чисел
+        function animateValue(id, start, end, duration) {
+            const obj = document.getElementById(id);
+            const range = end - start;
+            const startTime = performance.now();
+            
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const value = Math.floor(start + (range * progress));
+                obj.textContent = value;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+            
+            requestAnimationFrame(update);
+        }
+        
+        // Конфетти
+        function createConfetti() {
+            const colors = ['#FF6B9D', '#FFD93D', '#6BCF7F', '#4ECDC4', '#667eea'];
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                document.body.appendChild(confetti);
+                
+                setTimeout(() => confetti.remove(), 3000);
+            }
+        }
+        
+        // Отправка по Enter
+        document.getElementById('answer').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') submitAnswer();
+        });
+        
+        // Загружаем прогресс при старте
+        loadProgress();
+        
+        // Фокус на поле ввода
+        document.getElementById('answer').focus();
+    </script>
+</body>
+</html>

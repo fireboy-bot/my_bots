@@ -1,0 +1,73 @@
+.character-card {
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
+  animation: fadeInScale 0.5s ease-out;
+  position: relative;
+  z-index: 10 !important;  /* ✅ Аватарка выше частиц (0) */
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.character-image-wrapper {
+  border-radius: 20px;
+  overflow: visible;
+  background: transparent;
+  backdrop-filter: none;
+  border: 2px solid rgba(124, 58, 237, 0.4);
+  box-shadow: 
+    0 10px 40px rgba(0, 0, 0, 0.3),
+    0 0 30px rgba(124, 58, 237, 0.2);
+  transition: all 0.3s ease;
+  padding: 10px;
+  position: relative;
+  z-index: 11 !important;
+}
+
+.character-image-wrapper:hover {
+  transform: scale(1.02);
+  border-color: rgba(124, 58, 237, 0.7);
+  box-shadow: 0 15px 50px rgba(124, 58, 237, 0.4);
+}
+
+.character-image {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 1/1;
+  display: block;
+  border-radius: 16px;
+  object-fit: cover;
+  position: relative;
+  z-index: 12 !important;  /* ✅ Картинка самая высокая */
+}
+
+.character-placeholder {
+  width: 280px;
+  aspect-ratio: 1/1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.character-emoji {
+  font-size: 80px;
+  filter: drop-shadow(0 0 20px rgba(124, 58, 237, 0.5));
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.character-name {
+  color: #E2E8F0;
+  font-weight: 700;
+  font-size: 18px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}

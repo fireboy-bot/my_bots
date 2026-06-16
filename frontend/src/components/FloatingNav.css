@@ -1,0 +1,128 @@
+/* 🔹 FLOATING NAV PANEL — правый нижний угол */
+.floating-nav {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  
+  z-index: 1000 !important;
+  
+  animation: slideInRight 0.3s ease-out forwards;
+  pointer-events: auto;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 🔹 КНОПКИ */
+.nav-btn {
+  width: 48px;
+  height: 48px;
+  
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  
+  color: #E2E8F0;
+  font-size: 20px;
+  font-weight: 700;
+  
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 🔹 HOVER */
+.nav-btn:hover {
+  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* 🔹 ACTIVE */
+.nav-btn:active {
+  transform: scale(0.95);
+  transition: transform 0.1s ease;
+}
+
+/* 🔹 FOCUS */
+.nav-btn:focus-visible {
+  outline: 2px solid #7C3AED;
+  outline-offset: 2px;
+}
+
+/* 🔹 ТЕМЫ */
+.floating-nav--dark .nav-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #F1F5F9;
+}
+
+.floating-nav--dark .nav-btn:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.floating-nav--game .nav-btn--back:hover {
+  background: rgba(96, 165, 250, 0.25);
+  border-color: rgba(96, 165, 250, 0.4);
+}
+
+.floating-nav--game .nav-btn--menu:hover {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.floating-nav--game .nav-btn--settings:hover {
+  background: rgba(236, 72, 153, 0.25);
+  border-color: rgba(236, 72, 153, 0.4);
+}
+
+/* 🔹 АДАПТИВ */
+@media (max-width: 768px) {
+  .floating-nav {
+    right: 12px;
+    bottom: 12px;
+    gap: 8px;
+  }
+  
+  .nav-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 400px) {
+  .floating-nav {
+    right: 8px;
+    bottom: 8px;
+  }
+  
+  .nav-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+}

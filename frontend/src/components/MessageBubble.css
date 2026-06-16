@@ -1,0 +1,40 @@
+.message-bubble {
+  margin-bottom: 16px;
+  padding: 12px 20px;
+  border-radius: 18px;
+  font-weight: 700;
+  font-size: 16px;
+  max-width: 80%;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.message-bubble.player {
+  align-self: flex-end;
+  background: #22D3EE;
+  color: #0F172A;
+  border-bottom-right-radius: 4px;
+}
+
+.message-bubble.system {
+  align-self: flex-start;
+  background: rgba(30, 41, 59, 0.8);
+  color: #E2E8F0;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-bottom-left-radius: 4px;
+}
+
+.message-bubble.correct {
+  align-self: center;
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: white;
+  text-align: center;
+  width: 100%;
+}
+
+.message-bubble.incorrect {
+  align-self: center;
+  background: linear-gradient(135deg, #EF4444, #DC2626);
+  color: white;
+  text-align: center;
+  width: 100%;
+}

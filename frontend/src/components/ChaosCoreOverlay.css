@@ -1,0 +1,64 @@
+/* 🔹 КОНТЕЙНЕР ОВЕРЛЕЯ */
+.chaos-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 2; /* СЛОЙ 2: Трещины (выше частиц, ниже UI) */
+  overflow: hidden;
+}
+
+.chaos-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 🔹 ЗАТЕМНЕНИЕ */
+.chaos-darken {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--chaos-overlay, rgba(10, 12, 20, 0));
+  transition: background 0.8s ease;
+  z-index: 1;
+}
+
+/* 🔹 SCREEN SHAKE ДЛЯ ВСЕГО КОНТЕНТА */
+.task-screen,
+.character-card,
+.floating-nav {
+  animation: chaosShake var(--chaos-core-pulse, 1.5s) ease-in-out infinite;
+}
+
+@keyframes chaosShake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(calc(var(--chaos-shake, 0px) * -1), var(--chaos-shake, 0px)); }
+  50% { transform: translate(var(--chaos-shake, 0px), calc(var(--chaos-shake, 0px) * -1)); }
+  75% { transform: translate(calc(var(--chaos-shake, 0px) * -1), calc(var(--chaos-shake, 0px) * -1)); }
+}
+
+/* 🔹 ПУЛЬСАЦИЯ ЦЕНТРАЛЬНОГО ЯДРА (CSS-дополнение к Canvas) */
+.chaos-core-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(123, 92, 255, 0.8) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  animation: corePulse var(--chaos-core-pulse, 1.5s) ease-in-out infinite;
+  z-index: 2;
+}
+
+@keyframes corePulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+  50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+}

@@ -1,0 +1,92 @@
+/* 🔹 СБРОС СТИЛЕЙ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 🔹 BODY — базовые стили */
+body {
+  font-family: 'Nunito', sans-serif;
+  background: transparent !important;
+  min-height: 100vh;
+  color: #E2E8F0;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* 🔹 ROOT — БЕЗ Z-INDEX, ПРОЗРАЧНЫЙ */
+#root {
+  position: relative;
+  background: transparent !important;
+}
+
+/* 🔹 ФОНОВОЕ СВЕЧЕНИЕ — НИЖЕ ЧАСТИЦ (z-index: 0) */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 30% 20%, rgba(124,58,237,0.25), transparent);
+  pointer-events: none;
+  z-index: -1 !important;
+}
+
+/* 🔹 ВИНЬЕТКА — НА САМОМ ВЕРХУ, но прозрачная для кликов */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
+  pointer-events: none;
+  z-index: 9999 !important;
+  opacity: 0.4;
+}
+
+/* 🔹 Анимация появления карточек */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* 🔹 Скроллбар */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 58, 237, 0.7);
+}
+
+/* 🔹 Контейнер для центрирования */
+.container {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ❌ ВСЕ .task-screen стили УБРАНЫ — они теперь ТОЛЬКО в TaskScreen.css! */

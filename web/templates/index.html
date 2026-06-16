@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Числяндия</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 ЧИСЛЯНДИЯ</h1>
+        <p>Образовательная игра для детей</p>
+        
+        <div class="input-group">
+            <input type="number" id="userId" placeholder="ID игрока" />
+            <button onclick="viewProfile()">👤 Смотреть профиль</button>
+        </div>
+        
+        <div class="demo-link">
+            <a href="/profile/331113480">🥕 Профиль Морковки (демо)</a>
+        </div>
+    </div>
+    
+    <script>
+        function viewProfile() {
+            const userId = document.getElementById('userId').value;
+            if (userId) {
+                window.location.href = '/profile/' + userId;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,427 @@
+### MODULE ЭтаКнига.cls
+1|Attribute VB_Name = "\u042d\u0442\u0430\u041a\u043d\u0438\u0433\u0430"
+2|Attribute VB_Base = "0{00020819-0000-0000-C000-000000000046}"
+3|Attribute VB_GlobalNameSpace = False
+4|Attribute VB_Creatable = False
+5|Attribute VB_PredeclaredId = True
+6|Attribute VB_Exposed = True
+7|Attribute VB_TemplateDerived = False
+8|Attribute VB_Customizable = True
+### MODULE Лист1.cls
+1|Attribute VB_Name = "\u041b\u0438\u0441\u04421"
+2|Attribute VB_Base = "0{00020820-0000-0000-C000-000000000046}"
+3|Attribute VB_GlobalNameSpace = False
+4|Attribute VB_Creatable = False
+5|Attribute VB_PredeclaredId = True
+6|Attribute VB_Exposed = True
+7|Attribute VB_TemplateDerived = False
+8|Attribute VB_Customizable = True
+### MODULE UserForm1.frm
+1|Attribute VB_Name = "UserForm1"
+2|Attribute VB_Base = "0{8E4472FF-9052-48D4-B618-2AF190AB39A8}{D10F18A4-6458-4D59-9759-E291A69DB2D6}"
+3|Attribute VB_GlobalNameSpace = False
+4|Attribute VB_Creatable = False
+5|Attribute VB_PredeclaredId = True
+6|Attribute VB_Exposed = False
+7|Attribute VB_TemplateDerived = False
+8|Attribute VB_Customizable = False
+9|Option Explicit
+10|
+11|' ============================================================================
+12|' \u0424\u041e\u0420\u041c\u0410 \u0412\u0412\u041e\u0414\u0410 \u0414\u0410\u041d\u041d\u042b\u0425: \u0420\u0435\u0435\u0441\u0442\u0440_\u0434\u0435\u043b_2026 (v4.2 FINAL - \u0421 \u0418\u0421\u041f\u0420\u0410\u0412\u041b\u0415\u041d\u041d\u042b\u041c\u0418 \u0414\u0410\u0422\u0410\u041c\u0418)
+13|' ============================================================================
+14|
+15|' --- 1. \u0411\u041b\u041e\u041a\u0418\u0420\u041e\u0412\u041a\u0410 \u0412\u0412\u041e\u0414\u0410 (\u0414\u0410\u0422\u042b: \u0446\u0438\u0444\u0440\u044b \u0438 \u0442\u043e\u0447\u043a\u0430) ---
+16|Private Sub txtDateIn_KeyPress(ByVal KeyAscii As MSForms.ReturnInteger)
+17|    Select Case KeyAscii: Case 48 To 57, 46, 8: Case Else: KeyAscii = 0: End Select
+18|End Sub
+19|
+20|Private Sub txtDateAppointment_KeyPress(ByVal KeyAscii As MSForms.ReturnInteger)
+21|    Select Case KeyAscii: Case 48 To 57, 46, 8: Case Else: KeyAscii = 0: End Select
+22|End Sub
+23|
+24|Private Sub txtDateReview_KeyPress(ByVal KeyAscii As MSForms.ReturnInteger)
+25|    Select Case KeyAscii: Case 48 To 57, 46, 8: Case Else: KeyAscii = 0: End Select
+26|End Sub
+27|
+28|Private Sub txtDateSupplement_KeyPress(ByVal KeyAscii As MSForms.ReturnInteger)
+29|    Select Case KeyAscii: Case 48 To 57, 46, 8: Case Else: KeyAscii = 0: End Select
+30|End Sub
+31|
+32|Private Sub txtDateRequest_KeyPress(ByVal KeyAscii As MSForms.ReturnInteger)
+33|    Select Case KeyAscii: Case 48 To 57, 46, 8: Case Else: KeyAscii = 0: End Select
+34|End Sub
+35|
+36|' --- 2. \u0411\u041b\u041e\u041a\u0418\u0420\u041e\u0412\u041a\u0410 \u0412\u0412\u041e\u0414\u0410 (\u0421\u0427\u0415\u0422\u0427\u0418\u041a\u0418: \u0442\u043e\u043b\u044c\u043a\u043e \u0446\u0438\u0444\u0440\u044b) ---
+37|Private Sub txtSuppCount_KeyPress(ByVal KeyAscii As MSForms.ReturnInteger)
+38|    Select Case KeyAscii: Case 48 To 57, 8: Case Else: KeyAscii = 0: End Select
+39|End Sub
+40|
+41|Private Sub txtSuppSat_KeyPress(ByVal KeyAscii As MSForms.ReturnInteger)
+42|    Select Case KeyAscii: Case 48 To 57, 8: Case Else: KeyAscii = 0: End Select
+43|End Sub
+44|
+45|Private Sub txtSuppRef_KeyPress(ByVal KeyAscii As MSForms.ReturnInteger)
+46|    Select Case KeyAscii: Case 48 To 57, 8: Case Else: KeyAscii = 0: End Select
+47|End Sub
+48|
+49|' --- 3. \u0423\u041c\u041d\u0410\u042f \u0410\u041a\u0422\u0418\u0412\u0410\u0426\u0418\u042f \u0421\u041f\u0415\u0426\u041f\u041e\u041b\u0415\u0419 ---
+50|Private Sub cmbAddSubmitted_Change()
+51|    If cmbAddSubmitted.Value = "\u0414\u0430" Then
+52|        txtSuppCount.Enabled = True
+53|        txtSuppSat.Enabled = True
+54|        txtSuppRef.Enabled = True
+55|        txtSuppCount.BackColor = &HFFFFFF ' \u0411\u0435\u043b\u044b\u0439 (\u0430\u043a\u0442\u0438\u0432\u0435\u043d)
+56|    Else
+57|        txtSuppCount.Enabled = False
+58|        txtSuppSat.Enabled = False
+59|        txtSuppRef.Enabled = False
+60|        txtSuppCount.Value = ""
+61|        txtSuppSat.Value = ""
+62|        txtSuppRef.Value = ""
+63|        txtSuppCount.BackColor = &HE0E0E0 ' \u0421\u0435\u0440\u044b\u0439 (\u043d\u0435\u0430\u043a\u0442\u0438\u0432\u0435\u043d)
+64|    End If
+65|End Sub
+66|
+67|' --- 4. \u0424\u041e\u0420\u041c\u0410\u0422\u0418\u0420\u041e\u0412\u0410\u041d\u0418\u0415 \u0414\u0410\u0422 (\u041f\u0423\u041b\u0415\u041d\u0415\u041f\u0420\u041e\u0411\u0418\u0412\u0410\u0415\u041c\u0410\u042f) ---
+68|Private Sub FormatDateField(ctrl As MSForms.Control)
+69|    Dim raw As String
+70|    Dim d As Date
+71|    
+72|    raw = Trim(ctrl.Value)
+73|    If raw = "" Then Exit Sub
+74|    
+75|    ' \u0423\u0431\u0438\u0440\u0430\u0435\u043c \u0432\u0441\u0451 \u043b\u0438\u0448\u043d\u0435\u0435
+76|    raw = Replace(raw, ".", "")
+77|    raw = Replace(raw, " ", "")
+78|    
+79|    ' \u0415\u0441\u043b\u0438 \u0432\u0432\u0435\u043b\u0438 8 \u0446\u0438\u0444\u0440 \u043f\u043e\u0434\u0440\u044f\u0434 (\u0414\u0414\u041c\u041c\u0413\u0413\u0413\u0413) \u2014 \u0441\u043e\u0431\u0438\u0440\u0430\u0435\u043c \u0434\u0430\u0442\u0443 \u0432\u0440\u0443\u0447\u043d\u0443\u044e
+80|    If Len(raw) = 8 And IsNumeric(raw) Then
+81|        raw = Left(raw, 2) & "." & Mid(raw, 3, 2) & "." & Right(raw, 4)
+82|    End If
+83|    
+84|    On Error Resume Next
+85|    d = CDate(raw)
+86|    On Error GoTo 0
+87|    
+88|    If Err.Number <> 0 Or Year(d) < 2020 Or Year(d) > 2030 Then
+89|        MsgBox "\u041d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u0430\u044f \u0434\u0430\u0442\u0430. \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0432 \u0444\u043e\u0440\u043c\u0430\u0442\u0435 \u0414\u0414.\u041c\u041c.\u0413\u0413\u0413\u0413", vbExclamation, "\u041e\u0448\u0438\u0431\u043a\u0430 \u0432\u0432\u043e\u0434\u0430"
+90|        ctrl.Value = ""
+91|        ctrl.SetFocus
+92|        Exit Sub
+93|    End If
+94|    
+95|    ctrl.Value = Format(d, "dd.mm.yyyy")
+96|End Sub
+97|
+98|Private Sub txtDateIn_Exit(ByVal Cancel As MSForms.ReturnBoolean)
+99|    FormatDateField txtDateIn
+100|End Sub
+101|
+102|Private Sub txtDateAppointment_Exit(ByVal Cancel As MSForms.ReturnBoolean)
+103|    FormatDateField txtDateAppointment
+104|End Sub
+105|
+106|Private Sub txtDateReview_Exit(ByVal Cancel As MSForms.ReturnBoolean)
+107|    FormatDateField txtDateReview
+108|End Sub
+109|
+110|Private Sub txtDateSupplement_Exit(ByVal Cancel As MSForms.ReturnBoolean)
+111|    FormatDateField txtDateSupplement
+112|End Sub
+113|
+114|Private Sub txtDateRequest_Exit(ByVal Cancel As MSForms.ReturnBoolean)
+115|    FormatDateField txtDateRequest
+116|End Sub
+117|
+118|' --- 5. \u0418\u041d\u0418\u0426\u0418\u0410\u041b\u0418\u0417\u0410\u0426\u0418\u042f \u0424\u041e\u0420\u041c\u042b ---
+119|Private Sub UserForm_Initialize()
+120|    Dim yesNoArr As Variant
+121|    
+122|    On Error GoTo ErrHandler
+123|    
+124|    ' \u041e\u0447\u0438\u0441\u0442\u043a\u0430 \u043f\u043e\u043b\u0435\u0439
+125|    txtNumber.Value = ""
+126|    txtDescription.Value = ""
+127|    txtDateIn.Value = ""
+128|    txtDateAppointment.Value = ""
+129|    txtDateReview.Value = ""
+130|    txtDateSupplement.Value = ""
+131|    txtDateRequest.Value = ""
+132|    txtSuppCount.Value = ""
+133|    txtSuppSat.Value = ""
+134|    txtSuppRef.Value = ""
+135|    
+136|    ' \u0418\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u0438
+137|    With cmbExecutor
+138|        .Clear
+139|        .AddItem "\u041a\u0443\u0440\u0441\u0430\u0435\u0432 \u0410.\u0412."
+140|        .AddItem "\u0413\u043e\u0440\u0448\u043a\u043e\u0432 \u0418.\u0421."
+141|        .AddItem "\u0421\u0430\u0444\u043e\u043d\u043e\u0432\u0430 \u042e.\u0411."
+142|        .AddItem "\u0422\u043e\u0440\u0433\u0443\u0448\u0438\u043d\u0430 \u041d.\u0412."
+143|        .AddItem "\u041c\u0430\u0440\u044c\u044f\u043d \u0413.\u0412."
+144|        .AddItem "\u0414\u0443\u0434\u0443\u043a\u0438\u043d\u0430 \u0418.\u0412."
+145|        .AddItem "\u0414\u044b\u0440\u0434\u043e\u0432 \u0418.\u0410."
+146|        .AddItem "\u041f\u0435\u0441\u043a\u043e\u0432\u0430\u044f \u042e.\u0412."
+147|        .AddItem "\u0418\u0432\u0430\u0448\u0435\u0447\u043a\u0438\u043d\u0430 \u0421.\u0412."
+148|        .ListIndex = -1
+149|    End With
+150|    
+151|    ' \u0422\u0438\u043f\u044b \u0434\u0435\u043b
+152|    With cmbCaseType
+153|        .Clear
+154|        .AddItem "\u041d\u041f\u0410"
+155|        .AddItem "\u0418\u0441\u043a \u041e\u0412\u0414"
+156|        .ListIndex = -1
+157|    End With
+158|    
+159|    ' \u041f\u043e\u0434\u0442\u0438\u043f\u044b \u041d\u041f\u0410
+160|    With cmbNPAsubtype
+161|        .Clear
+162|        .AddItem "\u0423\u043a\u0430\u0437 \u041f\u0440\u0435\u0437\u0438\u0434\u0435\u043d\u0442\u0430"
+163|        .AddItem "\u041f\u043e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u041f\u0440\u0430\u0432\u0438\u0442\u0435\u043b\u044c\u0441\u0442\u0432\u0430"
+164|        .AddItem "\u0424\u0435\u0434\u0435\u0440\u0430\u043b\u044c\u043d\u044b\u0439 \u0437\u0430\u043a\u043e\u043d"
+165|        .AddItem "\u041f\u0440\u0438\u043a\u0430\u0437"
+166|        .AddItem "\u2014"
+167|        .ListIndex = -1
+168|    End With
+169|    
+170|    ' \u0421\u0442\u0430\u0442\u0443\u0441\u044b
+171|    With cmbStatus
+172|        .Clear
+173|        .AddItem "\u0420\u0430\u0441\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u043e"
+174|        .AddItem "\u041d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u043e"
+175|        .AddItem "\u041e\u0442\u043a\u0430\u0437\u0430\u043d\u043e"
+176|        .AddItem "\u0412 \u0440\u0430\u0431\u043e\u0442\u0435"
+177|        .ListIndex = -1
+178|    End With
+179|    
+180|    ' \u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u044b
+181|    With cmbResult
+182|        .Clear
+183|        .AddItem "\u0412 \u043f\u043e\u043b\u044c\u0437\u0443 \u041c\u0412\u0414"
+184|        .AddItem "\u0412 \u043f\u043e\u043b\u044c\u0437\u0443 \u0438\u043d\u043e\u0439 \u0441\u0442\u043e\u0440\u043e\u043d\u044b"
+185|        .AddItem "\u0411\u0435\u0437 \u0440\u0435\u0448\u0435\u043d\u0438\u044f"
+186|        .ListIndex = -1
+187|    End With
+188|    
+189|    ' \u0421\u043f\u0438\u0441\u043a\u0438 \u0414\u0430/\u041d\u0435\u0442
+190|    yesNoArr = Array("\u0414\u0430", "\u041d\u0435\u0442")
+191|    With cmbRequested: .Clear: .List = yesNoArr: .ListIndex = -1: End With
+192|    With cmbAddSubmitted: .Clear: .List = yesNoArr: .ListIndex = -1: End With
+193|    With cmbAddReviewed: .Clear: .List = yesNoArr: .ListIndex = -1: End With
+194|    With cmbDeputyComplaint: .Clear: .List = yesNoArr: .ListIndex = -1: End With
+195|    
+196|    ' \u0411\u043b\u043e\u043a\u0438\u0440\u0443\u0435\u043c \u0441\u043f\u0435\u0446\u043f\u043e\u043b\u044f \u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e
+197|    txtSuppCount.Enabled = False
+198|    txtSuppSat.Enabled = False
+199|    txtSuppRef.Enabled = False
+200|    txtSuppCount.BackColor = &HE0E0E0
+201|    
+202|    ' \u0424\u043e\u043a\u0443\u0441 \u043d\u0430 \u043f\u0435\u0440\u0432\u043e\u0435 \u043f\u043e\u043b\u0435
+203|    txtNumber.SetFocus
+204|    Exit Sub
+205|    
+206|ErrHandler:
+207|    MsgBox "\u041e\u0448\u0438\u0431\u043a\u0430 \u043f\u0440\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0435 \u0444\u043e\u0440\u043c\u044b: " & Err.Description, vbCritical, "\u0421\u0431\u043e\u0439"
+208|End Sub
+209|
+210|' --- 6. \u041a\u041d\u041e\u041f\u041a\u0410 \u0421\u041e\u0425\u0420\u0410\u041d\u0418\u0422\u042c ---
+211|Private Sub btnSave_Click()
+212|    Dim ws As Worksheet
+213|    Dim nextRow As Long
+214|    Dim lastCell As Range
+215|    Dim errMsg As String
+216|    
+217|    On Error GoTo ErrHandler
+218|    
+219|    ' \u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u044b\u0445 \u043f\u043e\u043b\u0435\u0439
+220|    errMsg = ""
+221|    If Trim(txtNumber.Value) = "" Then errMsg = errMsg & "\u2116 \u0434\u0435\u043b\u0430, "
+222|    If cmbExecutor.ListIndex = -1 Then errMsg = errMsg & "\u0418\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c, "
+223|    If cmbCaseType.ListIndex = -1 Then errMsg = errMsg & "\u0422\u0438\u043f \u0434\u0435\u043b\u0430, "
+224|    
+225|    If errMsg <> "" Then
+226|        MsgBox "\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u044b\u0435 \u043f\u043e\u043b\u044f: " & Left(errMsg, Len(errMsg) - 2), vbExclamation, "\u0412\u043d\u0438\u043c\u0430\u043d\u0438\u0435"
+227|        Exit Sub
+228|    End If
+229|    
+230|    ' \u041f\u043e\u0438\u0441\u043a \u043b\u0438\u0441\u0442\u0430
+231|    Set ws = Nothing
+232|    On Error Resume Next
+233|    Set ws = ThisWorkbook.Sheets("\u0420\u0435\u0435\u0441\u0442\u0440_2026")
+234|    On Error GoTo ErrHandler
+235|    If ws Is Nothing Then
+236|        MsgBox "\u041b\u0438\u0441\u0442 '\u0420\u0435\u0435\u0441\u0442\u0440_2026' \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d.", vbCritical, "\u041e\u0448\u0438\u0431\u043a\u0430"
+237|        Exit Sub
+238|    End If
+239|    
+240|    ' \u041f\u043e\u0438\u0441\u043a \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0439 \u0441\u0442\u0440\u043e\u043a\u0438
+241|    On Error Resume Next
+242|    Set lastCell = ws.Columns("A").Find(What:="*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+243|    On Error GoTo ErrHandler
+244|    nextRow = IIf(lastCell Is Nothing, 2, lastCell.Row + 1)
+245|    
+246|    ' \u0417\u0410\u041f\u0418\u0421\u042c \u0414\u0410\u041d\u041d\u042b\u0425
+247|    With ws
+248|        .Cells(nextRow, "A").Value = nextRow - 1                    ' A: \u2116 \u043f/\u043f
+249|        .Cells(nextRow, "B").Value = Trim(txtNumber.Value)          ' B: \u2116 \u0434\u0435\u043b\u0430
+250|        .Cells(nextRow, "C").Value = cmbExecutor.Value              ' C: \u0418\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c
+251|        .Cells(nextRow, "D").Value = cmbCaseType.Value              ' D: \u0422\u0438\u043f \u0434\u0435\u043b\u0430
+252|        .Cells(nextRow, "E").Value = cmbNPAsubtype.Value            ' E: \u041f\u043e\u0434\u0442\u0438\u043f \u041d\u041f\u0410
+253|        
+254|        ' \u0414\u0410\u0422\u042b \u2014 \u0441 \u043f\u0440\u0435\u043e\u0431\u0440\u0430\u0437\u043e\u0432\u0430\u043d\u0438\u0435\u043c \u0432 Date
+255|        If txtDateIn.Value <> "" Then
+256|            .Cells(nextRow, "F").Value = CDate(txtDateIn.Value)
+257|            .Cells(nextRow, "F").NumberFormat = "dd.mm.yyyy"
+258|        End If
+259|        
+260|        If txtDateAppointment.Value <> "" Then
+261|            .Cells(nextRow, "G").Value = CDate(txtDateAppointment.Value)
+262|            .Cells(nextRow, "G").NumberFormat = "dd.mm.yyyy"
+263|        End If
+264|        
+265|        If txtDateReview.Value <> "" Then
+266|            .Cells(nextRow, "H").Value = CDate(txtDateReview.Value)
+267|            .Cells(nextRow, "H").NumberFormat = "dd.mm.yyyy"
+268|        End If
+269|        
+270|        .Cells(nextRow, "I").Value = cmbStatus.Value                ' I: \u0421\u0442\u0430\u0442\u0443\u0441
+271|        .Cells(nextRow, "J").Value = cmbResult.Value                ' J: \u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442
+272|        .Cells(nextRow, "K").Value = cmbRequested.Value             ' K: \u0418\u0441\u0442\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u043e?
+273|        .Cells(nextRow, "L").Value = cmbAddSubmitted.Value          ' L: \u0414\u043e\u043f. \u043f\u043e\u0434\u0430\u043d\u043e?
+274|        .Cells(nextRow, "M").Value = cmbAddReviewed.Value           ' M: \u0414\u043e\u043f. \u0440\u0430\u0441\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u043e?
+275|        
+276|        If txtDateSupplement.Value <> "" Then
+277|            .Cells(nextRow, "N").Value = CDate(txtDateSupplement.Value)
+278|            .Cells(nextRow, "N").NumberFormat = "dd.mm.yyyy"
+279|        End If
+280|        
+281|        If txtDateRequest.Value <> "" Then
+282|            .Cells(nextRow, "O").Value = CDate(txtDateRequest.Value)
+283|            .Cells(nextRow, "O").NumberFormat = "dd.mm.yyyy"
+284|        End If
+285|        
+286|        .Cells(nextRow, "Q").Value = txtDescription.Value            ' Q: \u0421\u0443\u0442\u044c \u0434\u0435\u043b\u0430
+287|        .Cells(nextRow, "R").Value = cmbDeputyComplaint.Value        ' R: \u0416\u0430\u043b\u043e\u0431\u0430 \u043d\u0430 \u0417\u0430\u043c.?
+288|        .Cells(nextRow, "S").Value = IIf(txtSuppCount.Value = "", 0, Val(txtSuppCount.Value))   ' S: \u041a\u043e\u043b-\u0432\u043e \u043f\u043e\u0434\u0430\u043d\u043e
+289|        .Cells(nextRow, "T").Value = IIf(txtSuppSat.Value = "", 0, Val(txtSuppSat.Value))       ' T: \u041a\u043e\u043b-\u0432\u043e \u0443\u0434\u043e\u0432\u043b.
+290|        .Cells(nextRow, "U").Value = IIf(txtSuppRef.Value = "", 0, Val(txtSuppRef.Value))       ' U: \u041a\u043e\u043b-\u0432\u043e \u043e\u0442\u043a\u0430\u0437.
+291|    End With
+292|    
+293|    MsgBox "\u0414\u0435\u043b\u043e \u2116 " & txtNumber.Value & " \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e!", vbInformation, "\u0413\u043e\u0442\u043e\u0432\u043e"
+294|    Call btnClear_Click
+295|    txtNumber.SetFocus
+296|    Exit Sub
+297|    
+298|ErrHandler:
+299|    MsgBox "\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f: " & Err.Description, vbCritical, "\u0421\u0431\u043e\u0439"
+300|End Sub
+301|
+302|' --- 7. \u041a\u041d\u041e\u041f\u041a\u0410 \u041e\u0427\u0418\u0421\u0422\u0418\u0422\u042c ---
+303|Private Sub btnClear_Click()
+304|    On Error Resume Next
+305|    txtNumber.Value = ""
+306|    txtDescription.Value = ""
+307|    txtDateIn.Value = ""
+308|    txtDateAppointment.Value = ""
+309|    txtDateReview.Value = ""
+310|    txtDateSupplement.Value = ""
+311|    txtDateRequest.Value = ""
+312|    txtSuppCount.Value = ""
+313|    txtSuppSat.Value = ""
+314|    txtSuppRef.Value = ""
+315|    
+316|    cmbExecutor.ListIndex = -1
+317|    cmbCaseType.ListIndex = -1
+318|    cmbNPAsubtype.ListIndex = -1
+319|    cmbStatus.ListIndex = -1
+320|    cmbResult.ListIndex = -1
+321|    cmbRequested.ListIndex = -1
+322|    cmbAddSubmitted.ListIndex = -1
+323|    cmbAddReviewed.ListIndex = -1
+324|    cmbDeputyComplaint.ListIndex = -1
+325|    
+326|    ' \u0421\u0431\u0440\u043e\u0441 \u0441\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u044f \u0441\u043f\u0435\u0446\u043f\u043e\u043b\u0435\u0439
+327|    txtSuppCount.Enabled = False
+328|    txtSuppSat.Enabled = False
+329|    txtSuppRef.Enabled = False
+330|    txtSuppCount.BackColor = &HE0E0E0
+331|    
+332|    txtNumber.SetFocus
+333|End Sub
+334|
+335|' --- 8. \u041a\u041d\u041e\u041f\u041a\u0410 \u0417\u0410\u041a\u0420\u042b\u0422\u042c ---
+336|Private Sub btnClose_Click()
+337|    Unload Me
+338|End Sub
+### MODULE Лист3.cls
+1|Attribute VB_Name = "\u041b\u0438\u0441\u04423"
+2|Attribute VB_Base = "0{00020820-0000-0000-C000-000000000046}"
+3|Attribute VB_GlobalNameSpace = False
+4|Attribute VB_Creatable = False
+5|Attribute VB_PredeclaredId = True
+6|Attribute VB_Exposed = True
+7|Attribute VB_TemplateDerived = False
+8|Attribute VB_Customizable = True
+### MODULE Module1.bas
+1|Attribute VB_Name = "Module1"
+2|Sub \u041e\u0442\u043a\u0440\u044b\u0442\u044c\u0424\u043e\u0440\u043c\u0443\u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u044f()
+3|    UserForm1.Show
+4|End Sub
+### MODULE Лист14.cls
+1|Attribute VB_Name = "\u041b\u0438\u0441\u044214"
+2|Attribute VB_Base = "0{00020820-0000-0000-C000-000000000046}"
+3|Attribute VB_GlobalNameSpace = False
+4|Attribute VB_Creatable = False
+5|Attribute VB_PredeclaredId = True
+6|Attribute VB_Exposed = True
+7|Attribute VB_TemplateDerived = False
+8|Attribute VB_Customizable = True
+### MODULE Лист9.cls
+1|Attribute VB_Name = "\u041b\u0438\u0441\u04429"
+2|Attribute VB_Base = "0{00020820-0000-0000-C000-000000000046}"
+3|Attribute VB_GlobalNameSpace = False
+4|Attribute VB_Creatable = False
+5|Attribute VB_PredeclaredId = True
+6|Attribute VB_Exposed = True
+7|Attribute VB_TemplateDerived = False
+8|Attribute VB_Customizable = True
+### MODULE Лист15.cls
+1|Attribute VB_Name = "\u041b\u0438\u0441\u044215"
+2|Attribute VB_Base = "0{00020820-0000-0000-C000-000000000046}"
+3|Attribute VB_GlobalNameSpace = False
+4|Attribute VB_Creatable = False
+5|Attribute VB_PredeclaredId = True
+6|Attribute VB_Exposed = True
+7|Attribute VB_TemplateDerived = False
+8|Attribute VB_Customizable = True
+### MODULE Лист2.cls
+1|Attribute VB_Name = "\u041b\u0438\u0441\u04422"
+2|Attribute VB_Base = "0{00020820-0000-0000-C000-000000000046}"
+3|Attribute VB_GlobalNameSpace = False
+4|Attribute VB_Creatable = False
+5|Attribute VB_PredeclaredId = True
+6|Attribute VB_Exposed = True
+7|Attribute VB_TemplateDerived = False
+8|Attribute VB_Customizable = True
+### MODULE Module2.bas
+1|Attribute VB_Name = "Module2"
+2|Sub \u041e\u0442\u043a\u0440\u044b\u0442\u044c\u0420\u0435\u0435\u0441\u0442\u0440()
+3|    Sheets("\u0420\u0435\u0435\u0441\u0442\u0440_2026").Select
+4|    Range("A1").Select
+5|End Sub
+### MODULE Module3.bas
+1|Attribute VB_Name = "Module3"
+2|Sub \u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430()
+3|Sheets("\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430_\u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u043e\u0432").Select
+4|Range("A1").Select
+5|End Sub
+6|Sub \u041e\u0442\u0447\u0435\u0442\u0422\u0435\u043a\u0441\u0442()
+7|Sheets("\u041e\u0442\u0447\u0435\u0442_\u0442\u0435\u043a\u0441\u0442").Select
+8|Range("A1").Select
+9|End Sub
+10|Sub \u0418\u043d\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u044f\u0422\u0430\u0431\u043b\u0438\u0446\u044b()
+11|Sheets("\u0418\u043d\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u044f").Select
+12|Range("A1").Select
+13|End Sub
