@@ -1,0 +1,96 @@
+.game-event-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 10, 40, 0.72);
+  backdrop-filter: blur(6px);
+  animation: gameEventFadeIn 0.25s ease-out;
+}
+
+@keyframes gameEventFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.game-event-card {
+  width: min(420px, 100%);
+  padding: 28px 24px;
+  border-radius: 20px;
+  text-align: center;
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  animation: gameEventPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes gameEventPop {
+  from { opacity: 0; transform: scale(0.9) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.game-event-card--level {
+  background: linear-gradient(160deg, #312e81, #4c1d95);
+}
+
+.game-event-card--victory {
+  background: linear-gradient(160deg, #1e3a5f, #065f46);
+}
+
+.game-event-card--boss {
+  background: linear-gradient(160deg, #7f1d1d, #4c1d95);
+}
+
+.game-event-card__icon {
+  font-size: 52px;
+  margin-bottom: 8px;
+}
+
+.game-event-card h2 {
+  margin: 0 0 12px;
+  font-size: 28px;
+}
+
+.game-event-card p {
+  margin: 8px 0;
+  line-height: 1.45;
+}
+
+.game-event-card__highlight {
+  font-size: 36px;
+  font-weight: 800;
+  color: #fde047;
+}
+
+.game-event-card__sub {
+  opacity: 0.85;
+}
+
+.game-event-card__reward,
+.game-event-card__unlock,
+.game-event-card__boss,
+.game-event-card__level {
+  font-weight: 600;
+}
+
+.game-event-card__btn {
+  margin-top: 18px;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #1e1b4b;
+  background: linear-gradient(135deg, #fde047, #fbbf24);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.game-event-card__btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(251, 191, 36, 0.35);
+}

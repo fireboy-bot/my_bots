@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FloatingNav } from '../components/FloatingNav';
+import { GameEventOverlay } from '../components/GameEventOverlay';
 import { botApi } from '../adapters/botAdapter';
 import './BossScreen.css';
 
@@ -25,6 +26,7 @@ export function BossScreen({ userId = '331113480', bossId }) {
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [taskProgress, setTaskProgress] = useState(null);
+  const [gameEvent, setGameEvent] = useState(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -79,7 +81,11 @@ export function BossScreen({ userId = '331113480', bossId }) {
       if (result.boss_defeated) {
         setFeedback({ type: 'success', text: result.message });
         setBoss((prev) => ({ ...prev, boss_health: 0 }));
-        setTimeout(() => navigate(`/game/worlds/${userId}`), 3500);
+        setGameEvent({
+          type: 'boss_victory',
+          message: result.message,
+          rewardItem: result.reward_item,
+        });
         return;
       }
 
@@ -196,6 +202,14 @@ export function BossScreen({ userId = '331113480', bossId }) {
       </button>
 
       <FloatingNav userId={userId} showBack onBack={handleExit} showMenu theme="game" />
+
+      <GameEventOverlay
+        event={gameEvent}
+        onContinue={() => {
+          setGameEvent(null);
+          navigate(`/game/worlds/${userId}`);
+        }}
+      />
     </div>
   );
 }

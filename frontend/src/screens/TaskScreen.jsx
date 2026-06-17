@@ -5,6 +5,7 @@ import { ChaosArtifact } from '../components/ChaosArtifact';
 import { ChaosCoreOverlay } from '../components/ChaosCoreOverlay';
 import { ChaosParticles } from '../components/ChaosParticles';
 import { TaskArea } from '../components/TaskArea';
+import { GameEventOverlay } from '../components/GameEventOverlay';
 import { botApi } from '../adapters/botAdapter';
 import './TaskScreen.css';
 
@@ -112,14 +113,38 @@ export function TaskScreen({ userId = "331113480", worldId, onBack }) {
   const [activeWorld, setActiveWorld] = useState(null);
   const [profileReady, setProfileReady] = useState(false);
   const [runProgress, setRunProgress] = useState(null);
+  const [gameEvent, setGameEvent] = useState(null);
   
   const autoNextTimerRef = useRef(null);
   const taskLoadSeqRef = useRef(0);
+  const pendingActionRef = useRef(null);
   
   useEffect(() => {
     return () => {
       if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current);
     };
+  }, []);
+
+  const dismissGameEvent = useCallback(() => {
+    setGameEvent(null);
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (action) action();
+  }, []);
+
+  useEffect(() => {
+    if (gameEvent?.type !== 'level_up' || gameEvent.manualDismiss) return undefined;
+    const timer = setTimeout(dismissGameEvent, 2200);
+    return () => clearTimeout(timer);
+  }, [gameEvent, dismissGameEvent]);
+
+  const showLevelUp = useCallback((level, afterDismiss) => {
+    if (!level) {
+      afterDismiss?.();
+      return;
+    }
+    pendingActionRef.current = afterDismiss || null;
+    setGameEvent({ type: 'level_up', level, manualDismiss: !!afterDismiss });
   }, []);
 
   useEffect(() => {
@@ -240,6 +265,9 @@ export function TaskScreen({ userId = "331113480", worldId, onBack }) {
       if (result.new_total_score !== undefined) {
         setPlayerStats(prev => ({ ...prev, xp: result.new_total_score }));
       }
+      if (result.player_level_up) {
+        setPlayerStats(prev => ({ ...prev, level: result.player_level_up }));
+      }
       
       if (result.transfer_task && !transferTask) {
         setTransferTask(result.transfer_task);
@@ -256,13 +284,21 @@ export function TaskScreen({ userId = "331113480", worldId, onBack }) {
           reward: result.completion_bonus,
         });
         setRunProgress(null);
-        autoNextTimerRef.current = setTimeout(() => {
+        pendingActionRef.current = () => {
           if (result.boss_pending?.id) {
             navigate(`/game/boss/${userId}/${result.boss_pending.id}`);
           } else {
             navigate(`/game/worlds/${userId}`);
           }
-        }, 2500);
+        };
+        setGameEvent({
+          type: 'island_complete',
+          message: result.message,
+          completionBonus: result.completion_bonus || 0,
+          unlockedZone: result.unlocked_zone,
+          bossPending: result.boss_pending,
+          levelUp: result.player_level_up,
+        });
       } else if (transferTask && result.correct) {
         setFeedback({
           type: 'success',
@@ -274,17 +310,22 @@ export function TaskScreen({ userId = "331113480", worldId, onBack }) {
           startIslandRun();
         }, 1500);
       } else if (result.correct && result.next_task) {
+        const continueTask = () => {
+          setTask(result.next_task);
+          setRunProgress(result.run_progress || null);
+          setAnswerInput('');
+          setFeedback(null);
+        };
         setFeedback({
           type: 'success',
           text: result.message,
           reward: result.reward,
         });
-        autoNextTimerRef.current = setTimeout(() => {
-          setTask(result.next_task);
-          setRunProgress(result.run_progress || null);
-          setAnswerInput('');
-          setFeedback(null);
-        }, 1200);
+        if (result.player_level_up) {
+          showLevelUp(result.player_level_up, continueTask);
+        } else {
+          autoNextTimerRef.current = setTimeout(continueTask, 1200);
+        }
       } else {
         setFeedback({
           type: result.correct ? 'success' : 'error',
@@ -371,6 +412,8 @@ export function TaskScreen({ userId = "331113480", worldId, onBack }) {
         onBack={handleBack}
         theme="game"
       />
+
+      <GameEventOverlay event={gameEvent} onContinue={dismissGameEvent} />
     </div>
   );
 }
