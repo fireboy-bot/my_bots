@@ -158,6 +158,11 @@ class CastleEngine:
         user = self.storage.get_user(user_id)
         if not user:
             return (False, "❌ Игрок не найден")
+
+        from core.boss_run import is_castle_unlocked
+
+        if not is_castle_unlocked(user):
+            return (False, "❌ Декорации доступны после победы над Финальным Владыкой!")
         
         current_level = self.get_decoration_level(user_id, decoration_id)
         
@@ -225,6 +230,11 @@ class CastleEngine:
         user = self.storage.get_user(user_id)
         if not user:
             return (False, "❌ Игрок не найден")
+
+        from core.boss_run import is_castle_unlocked
+
+        if not is_castle_unlocked(user):
+            return (False, "❌ Замок откроется после победы над Финальным Владыкой!")
         
         # Стоимость: 50 золота в день
         cost = 50 * days

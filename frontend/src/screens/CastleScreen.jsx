@@ -280,8 +280,11 @@ export function CastleScreen({ userId = "331113480", onBack }) {
         </div>
         
         <div className="preview-actions">
+          <button className="action-btn" onClick={() => navigate(`/game/worlds/${userId}`)}>
+            ⚔️ К боссам
+          </button>
           <button className="action-btn" onClick={() => navigate('/game/task/' + userId)}>
-            ⚔️ Вернуться к задачам
+            📚 Вернуться к задачам
           </button>
           <button className="action-btn action-btn--secondary" onClick={handleChatWithVladimir}>
             🍵 Поболтать с Владимиром
@@ -339,7 +342,7 @@ export function CastleScreen({ userId = "331113480", onBack }) {
       <div className="upkeep-section">
         <h3>⚙️ Оплатить содержание</h3>
         <p className="upkeep-desc">
-          Цена: <strong>{(upkeepDays * 100).toLocaleString()} 🪙</strong> за {upkeepDays} день(ей)
+          Цена: <strong>{(upkeepDays * 50).toLocaleString()} 🪙</strong> за {upkeepDays} день(ей)
         </p>
         
         <div className="days-selector">
@@ -420,6 +423,9 @@ export function CastleScreen({ userId = "331113480", onBack }) {
 
       {/* 🔹 ДОПОЛНИТЕЛЬНЫЕ ДЕЙСТВИЯ */}
       <div className="extra-actions">
+        <button className="action-btn" onClick={() => navigate(`/game/shop/artifacts/${userId}`)}>
+          🔮 Артефакты
+        </button>
         <button className="action-btn action-btn--secondary" onClick={handleChatWithVladimir}>
           🍵 Поболтать с Владимиром
         </button>

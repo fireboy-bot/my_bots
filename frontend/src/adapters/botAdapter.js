@@ -125,6 +125,10 @@ export const botApi = {
     return await apiFetch(`/api/game/worlds/${encodeURIComponent(userId)}`);
   },
 
+  async getBosses(userId) {
+    return await apiFetch(`/api/game/bosses/${encodeURIComponent(userId)}`);
+  },
+
   // 🔹 Старт забега по острову (10 задач)
   async startLevel(userId, world) {
     return await apiFetch('/api/game/level/start', {

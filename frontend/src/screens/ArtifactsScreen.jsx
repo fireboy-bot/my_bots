@@ -50,13 +50,14 @@ export function ArtifactsScreen({ userId = "331113480", onBack }) {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [profile, castle] = await Promise.all([
+        const [profile, castle, artifactsData] = await Promise.all([
           botApi.getPlayerProfile(userId),
-          botApi.getCastleInfo(userId)
+          botApi.getCastleInfo(userId),
+          botApi.getArtifacts(userId),
         ]);
         setPlayerStats(profile);
         setCastleInfo(castle);
-        setArtifacts(profile?.artifact_upgrades || {});
+        setArtifacts(profile?.artifact_upgrades || artifactsData || {});
         
         // 🔹 Правильная проверка: замок открыт?
         const isCastleUnlocked = profile?.defeated_bosses?.includes('final_boss') || 
@@ -156,6 +157,13 @@ export function ArtifactsScreen({ userId = "331113480", onBack }) {
       {!isCastleUnlocked && (
         <div className="castle-locked-banner">
           🔒 Артефакты станут доступны после победы над Финальным Владыкой
+          <button
+            type="button"
+            className="artifacts-boss-cta"
+            onClick={() => navigate(`/game/worlds/${userId}`)}
+          >
+            ⚔️ К боссам
+          </button>
         </div>
       )}
       {isCastleUnlocked && !artifactsWork && (

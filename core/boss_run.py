@@ -12,6 +12,16 @@ from core.level_run import BOSS_MAP, BOSS_NAMES
 
 ISLAND_BOSS_MAP = BOSS_MAP
 
+FINAL_BOSS_ID = "final_boss"
+
+BOSS_CATALOG = [
+    {"id": "null_void", "emoji": "🌑", "name": "Нуль-Пустота", "tier": "island", "required_zone": "addition"},
+    {"id": "minus_shadow", "emoji": "🌑", "name": "Минус-Тень", "tier": "island", "required_zone": "subtraction"},
+    {"id": "evil_multiplier", "emoji": "🌀", "name": "Злой Умножитель", "tier": "island", "required_zone": "multiplication"},
+    {"id": "fracosaur", "emoji": "🌊", "name": "Дробозавр", "tier": "island", "required_zone": "division"},
+    {"id": FINAL_BOSS_ID, "emoji": "👑", "name": "Владыка Числяндии", "tier": "final", "required_zones": ["subtraction", "multiplication", "division"]},
+]
+
 REWARD_MAP = {
     "null_void": "звезда_сложения",
     "minus_shadow": "амулет_вычитания",
@@ -195,6 +205,57 @@ def get_boss_state(user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
 
 
+def is_castle_unlocked(user: Dict[str, Any]) -> bool:
+    defeated = set(user.get("defeated_bosses") or [])
+    return FINAL_BOSS_ID in defeated or bool(user.get("completed_normal_game"))
+
+
+def can_start_boss(user: Dict[str, Any], boss_id: str) -> tuple[bool, str]:
+    if boss_id in set(user.get("defeated_bosses") or []):
+        return False, "Этот босс уже побеждён"
+
+    unlocked = set(user.get("unlocked_zones") or ["addition"])
+
+    if boss_id == "null_void" and "addition" not in unlocked:
+        return False, "Сначала пройди Остров Сложения!"
+    if boss_id == "minus_shadow" and "subtraction" not in unlocked:
+        return False, "Сначала победи Нуль-Пустоту!"
+    if boss_id == "evil_multiplier" and "multiplication" not in unlocked:
+        return False, "Сначала победи Минус-Тень!"
+    if boss_id == "fracosaur" and "division" not in unlocked:
+        return False, "Сначала победи Злого Умножителя!"
+    if boss_id == FINAL_BOSS_ID:
+        required = {"subtraction", "multiplication", "division"}
+        if not required.issubset(unlocked):
+            return False, "Победи боссов островов: Вычитание, Умножение и Деление!"
+
+    return True, ""
+
+
+def list_bosses_for_user(user: Dict[str, Any]) -> List[Dict[str, Any]]:
+    defeated = set(user.get("defeated_bosses") or [])
+    info = _load_boss_info()
+    bosses: List[Dict[str, Any]] = []
+
+    for entry in BOSS_CATALOG:
+        boss_id = entry["id"]
+        meta = info.get(boss_id, {})
+        can_start, lock_reason = can_start_boss(user, boss_id)
+        bosses.append(
+            {
+                "id": boss_id,
+                "emoji": meta.get("emoji", entry.get("emoji", "👹")),
+                "name": meta.get("name", BOSS_NAMES.get(boss_id, boss_id)),
+                "description": meta.get("description", ""),
+                "tier": entry.get("tier", "island"),
+                "defeated": boss_id in defeated,
+                "unlocked": can_start,
+                "lock_reason": lock_reason if not can_start and boss_id not in defeated else "",
+            }
+        )
+    return bosses
+
+
 def resolve_boss_id(user: Dict[str, Any], boss_id: Optional[str]) -> Optional[str]:
     if boss_id:
         return boss_id
@@ -216,6 +277,10 @@ def start_boss_run(storage, user_id: str, boss_id: Optional[str] = None) -> Dict
     defeated = set(user.get("defeated_bosses") or [])
     if boss_id in defeated:
         return {"error": "Этот босс уже побеждён"}
+
+    allowed, lock_reason = can_start_boss(user, boss_id)
+    if not allowed:
+        return {"error": f"🔒 {lock_reason}"}
 
     if user.get("in_boss_battle") and user.get("current_boss") == boss_id:
         state = get_boss_state(user)
@@ -425,9 +490,10 @@ def _finalize_boss_victory(storage, user_id: str, user: Dict[str, Any], boss_id:
     name = info.get("name", BOSS_NAMES.get(boss_id, boss_id))
     unlocked = user.get("unlocked_zones", [])
 
-    return {
+    result = {
         "correct": True,
         "boss_defeated": True,
+        "boss_id": boss_id,
         "reward_item": reward_item,
         "unlocked_zones": unlocked,
         "message": f"🎉 ПОБЕДА над {name}! Награда: {reward_item.replace('_', ' ')}",
@@ -435,3 +501,11 @@ def _finalize_boss_victory(storage, user_id: str, user: Dict[str, Any], boss_id:
         "new_balance": user.get("score_balance", 0),
         "new_total_score": user.get("total_score", 0),
     }
+    if boss_id == FINAL_BOSS_ID:
+        result["castle_unlocked"] = True
+        result["completed_normal_game"] = True
+        result["message"] = (
+            f"🎉 ПОБЕДА над {name}! Замок и артефакты открыты! "
+            f"Награда: {reward_item.replace('_', ' ')}"
+        )
+    return result

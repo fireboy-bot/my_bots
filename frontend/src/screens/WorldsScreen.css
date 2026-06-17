@@ -118,3 +118,104 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+.worlds-bosses {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.worlds-bosses__title {
+  margin: 0;
+  text-align: center;
+  font-size: 20px;
+  color: #e2e8f0;
+}
+
+.worlds-bosses__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.boss-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  border: 2px solid rgba(251, 191, 36, 0.25);
+  border-radius: 14px;
+  background: rgba(30, 27, 75, 0.65);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.boss-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(251, 191, 36, 0.65);
+}
+
+.boss-card--locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.boss-card--defeated {
+  opacity: 0.75;
+  border-color: rgba(107, 207, 127, 0.45);
+}
+
+.boss-card--final {
+  grid-column: 1 / -1;
+  padding: 18px 14px;
+  border-color: rgba(251, 191, 36, 0.55);
+  background: linear-gradient(160deg, rgba(76, 29, 149, 0.55), rgba(30, 27, 75, 0.8));
+}
+
+.boss-card__emoji {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.boss-card__name {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.boss-card__desc {
+  margin: 0;
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.boss-card__status {
+  font-size: 12px;
+  color: #fbbf24;
+}
+
+.boss-card--defeated .boss-card__status {
+  color: #6bcf7f;
+}
+
+.worlds-castle-cta {
+  display: flex;
+  justify-content: center;
+}
+
+.worlds-castle-cta__btn {
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e1b4b;
+  background: linear-gradient(135deg, #fde047, #fbbf24);
+  cursor: pointer;
+}

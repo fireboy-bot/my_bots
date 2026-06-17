@@ -95,6 +95,32 @@
   font-weight: 600;
 }
 
+/* 🔹 ЗАМОК НЕ ОТКРЫТ */
+.castle-locked-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+  color: #fde68a;
+  font-size: 14px;
+}
+
+.artifacts-boss-cta {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #1e1b4b;
+  background: linear-gradient(135deg, #fde047, #fbbf24);
+}
+
 /* 🔹 СПИСОК АРТЕФАКТОВ */
 .artifacts-list {
   display: flex;

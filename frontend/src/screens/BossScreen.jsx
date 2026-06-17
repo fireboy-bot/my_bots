@@ -81,11 +81,23 @@ export function BossScreen({ userId = '331113480', bossId }) {
       if (result.boss_defeated) {
         setFeedback({ type: 'success', text: result.message });
         setBoss((prev) => ({ ...prev, boss_health: 0 }));
-        setGameEvent({
-          type: 'boss_victory',
-          message: result.message,
-          rewardItem: result.reward_item,
-        });
+        if (result.castle_unlocked || bossId === 'final_boss') {
+          setGameEvent({
+            type: 'final_boss_victory',
+            message: result.message,
+            rewardItem: result.reward_item,
+            onCastle: () => {
+              setGameEvent(null);
+              navigate(`/game/castle/${userId}`);
+            },
+          });
+        } else {
+          setGameEvent({
+            type: 'boss_victory',
+            message: result.message,
+            rewardItem: result.reward_item,
+          });
+        }
         return;
       }
 

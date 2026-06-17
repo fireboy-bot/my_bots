@@ -45,6 +45,39 @@ def test_get_worlds(client, seeded_user, user_id):
     assert len(locked) >= 1
 
 
+def test_get_bosses(client, seeded_user, user_id):
+    r = client.get(f"/api/game/bosses/{user_id}")
+    assert r.status_code == 200
+    data = r.get_json()
+    bosses = data.get("bosses", [])
+    assert len(bosses) >= 5
+    final = next(b for b in bosses if b["id"] == "final_boss")
+    assert final["tier"] == "final"
+    assert final["unlocked"] is False
+    assert data["castle_unlocked"] is False
+
+
+def test_final_boss_locked_without_zones(client, seeded_user, user_id):
+    r = client.post(
+        "/api/game/boss/start",
+        data=json.dumps({"user_id": user_id, "boss_id": "final_boss"}),
+        content_type="application/json",
+    )
+    assert r.status_code == 403
+    assert "🔒" in r.get_json().get("error", "")
+
+
+def test_artifact_upgrade_requires_castle(client, seeded_user, user_id):
+    r = client.post(
+        f"/api/artifacts/{user_id}/upgrade",
+        data=json.dumps({"artifact_id": "artifact_luck"}),
+        content_type="application/json",
+    )
+    body = r.get_json()
+    assert body.get("success") is False
+    assert "Владык" in body.get("message", "")
+
+
 def test_get_task_locked_world(client, seeded_user, user_id):
     r = client.get(f"/api/game/task?user_id={user_id}&world=logic_world")
     assert r.status_code == 403

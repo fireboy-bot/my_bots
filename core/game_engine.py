@@ -666,6 +666,19 @@ class ChislyandiaEngine:
             "worlds": list_worlds_for_user(user),
         }
 
+    def get_bosses(self, user_id: str) -> Dict[str, Any]:
+        """Каталог боссов с флагами unlocked/defeated."""
+        from core.boss_run import list_bosses_for_user, is_castle_unlocked
+
+        user = self.storage.get_user(user_id)
+        if not user:
+            return {"error": "Игрок не найден"}
+        return {
+            "user_id": user_id,
+            "castle_unlocked": is_castle_unlocked(user),
+            "bosses": list_bosses_for_user(user),
+        }
+
     def resolve_task_answer(
         self,
         task_id: str,

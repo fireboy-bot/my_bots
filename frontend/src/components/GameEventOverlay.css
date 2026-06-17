@@ -44,6 +44,23 @@
   background: linear-gradient(160deg, #7f1d1d, #4c1d95);
 }
 
+.game-event-card--final {
+  background: linear-gradient(160deg, #78350f, #4c1d95, #1e3a5f);
+}
+
+.game-event-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.game-event-card__btn--ghost {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  box-shadow: none;
+}
+
 .game-event-card__icon {
   font-size: 52px;
   margin-bottom: 8px;

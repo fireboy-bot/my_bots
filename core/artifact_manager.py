@@ -142,6 +142,11 @@ class ArtifactManager:
         user = self.storage.get_user(user_id)
         if not user:
             return False, "❌ Игрок не найден"
+
+        from core.boss_run import is_castle_unlocked
+
+        if not is_castle_unlocked(user):
+            return False, "❌ Артефакты откроются после победы над Финальным Владыкой!"
         
         can_upgrade, message, cost = self.can_upgrade(user_id, artifact_id)
         if not can_upgrade:

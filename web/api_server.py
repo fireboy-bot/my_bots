@@ -97,6 +97,19 @@ def get_worlds(user_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/game/bosses/<user_id>')
+def get_bosses(user_id):
+    """[GET] Каталог боссов — островные + финальный."""
+    try:
+        result = engine.get_bosses(user_id)
+        if result.get("error"):
+            return jsonify(result), 404
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[ERROR] get_bosses: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/game/level/start', methods=['POST'])
 def start_level():
     """[POST] Старт забега по острову — 10 задач как в Telegram."""

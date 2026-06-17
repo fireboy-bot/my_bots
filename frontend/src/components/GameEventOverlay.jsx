@@ -94,6 +94,30 @@ export function GameEventOverlay({ event, onContinue }) {
     );
   }
 
+  if (event.type === 'final_boss_victory') {
+    return (
+      <div className="game-event-overlay" role="dialog" aria-modal="true" aria-live="polite">
+        <div className="game-event-card game-event-card--final">
+          <div className="game-event-card__icon">👑</div>
+          <h2>Владыка повержен!</h2>
+          <p>{event.message}</p>
+          <p className="game-event-card__unlock">🏰 Замок открыт · 🔮 Артефакты доступны</p>
+          {event.rewardItem && (
+            <p className="game-event-card__reward">Награда: {event.rewardItem.replace(/_/g, ' ')}</p>
+          )}
+          <div className="game-event-card__actions">
+            <button type="button" className="game-event-card__btn" onClick={event.onCastle}>
+              В замок
+            </button>
+            <button type="button" className="game-event-card__btn game-event-card__btn--ghost" onClick={onContinue}>
+              На карту
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return null;
   })();
 
