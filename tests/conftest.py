@@ -54,5 +54,11 @@ def seeded_user(user_id):
     user["score_balance"] = 500
     user["total_score"] = 500
     user["unlocked_zones"] = ["addition"]
+    user["current_level"] = None
+    user["selected_tasks"] = []
+    user["current_task_index"] = 0
+    user["mistakes_in_level"] = 0
+    user["consecutive_errors"] = 0
+    user["chaos_energy"] = 0
     storage.save_user(uid, user)
     return user_id

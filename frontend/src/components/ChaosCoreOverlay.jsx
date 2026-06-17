@@ -42,6 +42,10 @@ export function ChaosCoreOverlay({ chaosEnergy = 0, riftStage = 0 }) {
   const animate = useCallback((timestamp) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (document.hidden) {
+      rafRef.current = requestAnimationFrame(animate);
+      return;
+    }
     const ctx = canvas.getContext('2d');
     const w = canvas.width;
     const h = canvas.height;
@@ -93,8 +97,10 @@ export function ChaosCoreOverlay({ chaosEnergy = 0, riftStage = 0 }) {
     if (!canvas) return;
 
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const parent = canvas.parentElement;
+      if (!parent) return;
+      canvas.width = parent.clientWidth;
+      canvas.height = parent.clientHeight;
     };
     resize();
     window.addEventListener('resize', resize);

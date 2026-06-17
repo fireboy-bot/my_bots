@@ -99,6 +99,26 @@ def parse_task_id(task_id: str) -> tuple[Optional[str], Optional[int]]:
     return None, None
 
 
+def get_task_by_id(task_id: str, island_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Задача по id (в т.ч. transfer_addition_11 → addition_11)."""
+    if not task_id:
+        return None
+
+    lookup_id = str(task_id)
+    if lookup_id.startswith("transfer_"):
+        lookup_id = lookup_id[len("transfer_") :]
+
+    world, _ = parse_task_id(lookup_id)
+    search_world = island_id or world
+    if not search_world:
+        return None
+
+    for task in get_normalized_tasks(search_world):
+        if task.get("id") == lookup_id:
+            return task
+    return None
+
+
 def resolve_expected_answer(task_id: str, island_id: Optional[str] = None, client_expected: Any = None) -> Optional[str]:
     """Правильный ответ по task_id из файлов миров."""
     if not task_id:
@@ -129,8 +149,18 @@ def pick_random_task(world_id: str) -> Optional[Dict[str, Any]]:
 
 def pick_task_for_user(storage, user_id: str, world: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Выбор задачи с учётом прогресса игрока (как в TG — по разблокированным мирам)."""
+    from core.progression import resolve_playable_world
+    from core.level_run import get_current_run_task, get_run_progress
+
+    user = storage.get_user(user_id) if storage else None
+    world = resolve_playable_world(user, world)
     if not world:
-        user = storage.get_user(user_id) if storage else None
-        zones = (user or {}).get("unlocked_zones") or ["addition"]
-        world = zones[-1] if zones else "addition"
+        return None
+
+    if user and user.get("current_level") == world and user.get("selected_tasks"):
+        task = get_current_run_task(user)
+        if task:
+            task["run_progress"] = get_run_progress(user)
+            return task
+
     return pick_random_task(world)

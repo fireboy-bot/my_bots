@@ -31,6 +31,20 @@
   box-sizing: border-box;
   position: relative;
   overflow: hidden;
+  isolation: isolate;
+}
+
+.task-screen-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.task-screen > :not(.task-screen-fx) {
+  position: relative;
+  z-index: 2;
 }
 
 /* 🔹 БАЗОВЫЕ ПАНЕЛИ */
@@ -45,10 +59,10 @@
   overflow: hidden;
 }
 
-.game-stats { grid-area: stats; box-shadow: var(--glow-soft); display: flex; flex-direction: column; gap: 16px; }
-.game-settings { grid-area: settings; opacity: 0.85; display: flex; flex-direction: column; gap: 12px; }
-.game-chaos { grid-area: chaos; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
-.game-nav { grid-area: nav; display: flex; flex-direction: column; gap: 12px; justify-content: flex-end; }
+.game-stats { grid-area: stats; box-shadow: var(--glow-soft); display: flex; flex-direction: column; gap: 16px; position: relative; z-index: 5; }
+.game-settings { grid-area: settings; opacity: 0.85; display: flex; flex-direction: column; gap: 12px; position: relative; z-index: 5; }
+.game-chaos { grid-area: chaos; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; position: relative; z-index: 5; }
+.game-nav { grid-area: nav; display: flex; flex-direction: column; gap: 12px; justify-content: flex-end; position: relative; z-index: 5; }
 
 /* 🔹 СТАТИСТИКА: ЦВЕТА */
 .stat-item { display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
@@ -60,7 +74,7 @@
 .stat-item:has(.stat-icon[data-type="level"]) .stat-value { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.5); }
 
 /* 🔹 ЦЕНТРАЛЬНАЯ КАРТОЧКА (СЦЕНА) */
-.game-center { grid-area: center; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; z-index: 2; }
+.game-center { grid-area: center; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; z-index: 5; }
 
 .task-card {
   position: relative;
@@ -107,7 +121,37 @@
   80% { transform: translateX(3px); }
 }
 
+.task-progress {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #6bcf7f;
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
+}
+
 .task-question { font-size: 2rem; font-weight: 800; margin: 0 0 24px 0; color: #f8fafc; line-height: 1.3; }
+
+.transfer-banner {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  text-align: left;
+}
+.transfer-banner__title { display: block; font-weight: 800; color: #e9d5ff; margin-bottom: 6px; }
+.transfer-banner__message { display: block; font-size: 0.95rem; color: #f3e8ff; margin-bottom: 4px; }
+.transfer-banner__hint { display: block; font-size: 0.85rem; color: #c4b5fd; font-style: italic; }
+
+.task-screen.chaos-active .game-center { position: relative; z-index: 3; }
+.task-screen.chaos-active .task-card {
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12), 0 0 50px rgba(168, 85, 247, 0.25), 0 20px 60px rgba(0,0,0,0.6);
+}
+.task-screen.chaos-active .task-question,
+.task-screen.chaos-active .answer-input {
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
 
 /* 🔹 INPUT (ЖИВАЯ РЕАКЦИЯ) */
 .answer-input {
@@ -163,6 +207,13 @@
 .feedback--success { background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.4); }
 .feedback--error { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); }
 @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+/* 🔹 На десктопе — только боковая NavPanel, без дубля FloatingNav */
+@media (min-width: 1025px) {
+  .task-screen .floating-nav {
+    display: none;
+  }
+}
 
 /* 🔹 АДАПТИВ */
 @media (max-width: 1024px) {

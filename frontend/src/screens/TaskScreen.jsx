@@ -91,7 +91,7 @@ const NavPanel = memo(function NavPanel({ onBack, userId, navigate }) {
 });
 
 // 🔹 ОСНОВНОЙ КОМПОНЕНТ
-export function TaskScreen({ userId = "331113480", onBack }) {
+export function TaskScreen({ userId = "331113480", worldId, onBack }) {
   const navigate = useNavigate();
   
   // 🔹 Состояния ТОЛЬКО для центральной зоны
@@ -111,6 +111,7 @@ export function TaskScreen({ userId = "331113480", onBack }) {
   });
   const [activeWorld, setActiveWorld] = useState(null);
   const [profileReady, setProfileReady] = useState(false);
+  const [runProgress, setRunProgress] = useState(null);
   
   const autoNextTimerRef = useRef(null);
   const taskLoadSeqRef = useRef(0);
@@ -136,9 +137,20 @@ export function TaskScreen({ userId = "331113480", onBack }) {
         setChaosState(profileToChaos(profile));
 
         const zones = profile?.unlocked_zones;
-        setActiveWorld(
-          Array.isArray(zones) && zones.length > 0 ? zones[zones.length - 1] : 'addition'
-        );
+        const fallbackWorld =
+          Array.isArray(zones) && zones.length > 0 ? zones[zones.length - 1] : 'addition';
+
+        if (worldId) {
+          const unlocked = Array.isArray(zones) ? zones : ['addition'];
+          if (!unlocked.includes(worldId)) {
+            setFeedback({ type: 'error', text: '🔒 Этот остров ещё закрыт' });
+            setActiveWorld(null);
+            return;
+          }
+          setActiveWorld(worldId);
+        } else {
+          setActiveWorld(fallbackWorld);
+        }
       } catch (error) {
         console.error('❌ Error loading profile:', error);
         setActiveWorld('addition');
@@ -150,9 +162,9 @@ export function TaskScreen({ userId = "331113480", onBack }) {
     if (userId) {
       loadProfile();
     }
-  }, [userId]);
+  }, [userId, worldId]);
 
-  const loadTask = useCallback(async () => {
+  const startIslandRun = useCallback(async () => {
     if (!profileReady || !activeWorld) return;
 
     const seq = ++taskLoadSeqRef.current;
@@ -164,16 +176,19 @@ export function TaskScreen({ userId = "331113480", onBack }) {
     setLoading(true);
 
     try {
-      const taskData = await botApi.getTask(userId, activeWorld);
+      const data = await botApi.startLevel(userId, activeWorld);
       if (seq !== taskLoadSeqRef.current) return;
 
-      setTask(taskData);
-      if (taskData.chaos_state) {
-        setChaosState(prev => ({ ...prev, ...taskData.chaos_state }));
+      if (data?.error) {
+        setFeedback({ type: 'error', text: data.error });
+        return;
       }
+
+      setTask(data.task);
+      setRunProgress(data.run_progress || null);
     } catch (error) {
       if (seq !== taskLoadSeqRef.current) return;
-      console.error('❌ Error loading task:', error);
+      console.error('❌ Error starting level:', error);
       setFeedback({ type: 'error', text: '⚠️ API недоступен. Запусти web/api_server.py на порту 5000' });
     } finally {
       if (seq === taskLoadSeqRef.current) {
@@ -184,9 +199,9 @@ export function TaskScreen({ userId = "331113480", onBack }) {
 
   useEffect(() => {
     if (profileReady && activeWorld) {
-      loadTask();
+      startIslandRun();
     }
-  }, [profileReady, activeWorld, loadTask]);
+  }, [profileReady, activeWorld, startIslandRun]);
 
   // 🔹 Обработка ввода
   const handleInputChange = (e) => {
@@ -228,7 +243,48 @@ export function TaskScreen({ userId = "331113480", onBack }) {
       
       if (result.transfer_task && !transferTask) {
         setTransferTask(result.transfer_task);
-        setFeedback({ type: 'transfer', text: result.message, hint: result.transfer_task.hint });
+        setAnswerInput('');
+        setFeedback({
+          type: 'transfer',
+          text: result.message,
+          hint: result.transfer_task.hint || 'Тот же пример — другой порядок чисел!',
+        });
+      } else if (result.island_complete) {
+        setFeedback({
+          type: 'success',
+          text: result.message,
+          reward: result.completion_bonus,
+        });
+        setRunProgress(null);
+        autoNextTimerRef.current = setTimeout(() => {
+          if (result.boss_pending?.id) {
+            navigate(`/game/boss/${userId}/${result.boss_pending.id}`);
+          } else {
+            navigate(`/game/worlds/${userId}`);
+          }
+        }, 2500);
+      } else if (transferTask && result.correct) {
+        setFeedback({
+          type: 'success',
+          text: result.message,
+          reward: result.reward,
+        });
+        autoNextTimerRef.current = setTimeout(() => {
+          setTransferTask(null);
+          startIslandRun();
+        }, 1500);
+      } else if (result.correct && result.next_task) {
+        setFeedback({
+          type: 'success',
+          text: result.message,
+          reward: result.reward,
+        });
+        autoNextTimerRef.current = setTimeout(() => {
+          setTask(result.next_task);
+          setRunProgress(result.run_progress || null);
+          setAnswerInput('');
+          setFeedback(null);
+        }, 1200);
       } else {
         setFeedback({
           type: result.correct ? 'success' : 'error',
@@ -238,7 +294,12 @@ export function TaskScreen({ userId = "331113480", onBack }) {
         
         if (result.correct) {
           autoNextTimerRef.current = setTimeout(() => {
-            loadTask();
+            startIslandRun();
+          }, 1500);
+        } else if (!result.retry_same_task) {
+          setTimeout(() => {
+            setFeedback(null);
+            setAnswerInput('');
           }, 1500);
         } else {
           setTimeout(() => {
@@ -246,13 +307,6 @@ export function TaskScreen({ userId = "331113480", onBack }) {
             setAnswerInput('');
           }, 1500);
         }
-      }
-      
-      if (transferTask && result.correct) {
-        setTimeout(() => {
-          setTransferTask(null);
-          loadTask();
-        }, 1500);
       }
       
     } catch (error) {
@@ -265,7 +319,7 @@ export function TaskScreen({ userId = "331113480", onBack }) {
 
   const handleBack = () => {
     if (onBack) onBack();
-    else navigate('/game/menu/' + userId);
+    else navigate('/game/worlds/' + userId);
   };
 
   // 🔹 Скелетон загрузки
@@ -278,12 +332,17 @@ export function TaskScreen({ userId = "331113480", onBack }) {
   }
 
   const isChaosActive = chaosState.rift_stage >= 2;
+  const chaosFxEnabled = !loading && (chaosState.chaos_energy > 0 || chaosState.rift_stage > 0);
 
   return (
     <div className={`task-screen ${isChaosActive ? 'chaos-active' : ''}`}>
-      {/* 🔹 СЛОЙ ЭФФЕКТОВ */}
-      <ChaosParticles chaosEnergy={chaosState.chaos_energy} riftStage={chaosState.rift_stage} enabled={!loading} />
-      <ChaosCoreOverlay chaosEnergy={chaosState.chaos_energy} riftStage={chaosState.rift_stage} />
+      {/* 🔹 СЛОЙ ЭФФЕКТОВ — только когда хаос реально активен */}
+      {chaosFxEnabled && (
+        <div className="task-screen-fx" aria-hidden="true">
+          <ChaosParticles chaosEnergy={chaosState.chaos_energy} riftStage={chaosState.rift_stage} enabled />
+          <ChaosCoreOverlay chaosEnergy={chaosState.chaos_energy} riftStage={chaosState.rift_stage} />
+        </div>
+      )}
 
       {/* 🔹 ПАНЕЛИ */}
       <StatsPanel playerStats={playerStats} />
@@ -293,6 +352,7 @@ export function TaskScreen({ userId = "331113480", onBack }) {
         feedback={feedback}
         processing={processing}
         chaosState={chaosState}
+        runProgress={runProgress}
         answerInput={answerInput}
         onAnswerSubmit={handleSubmit}
         onInputChange={handleInputChange}

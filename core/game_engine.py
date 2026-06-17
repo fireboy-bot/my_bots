@@ -218,6 +218,41 @@ class ChislyandiaEngine:
         user = self.storage.get_user(user_id)
         if not user:
             return {"correct": False, "reward": 0, "message": "❌ Игрок не найден", "chaos_state": None, "transfer_task": None}
+
+        active_level = user.get("current_level")
+        if active_level and not is_transfer and user.get("selected_tasks"):
+            island = island_id or active_level
+            if island == active_level:
+                from core.level_run import process_level_answer
+
+                result = process_level_answer(self.storage, self.score_manager, user_id, is_correct)
+                if not result.get("error"):
+                    user = self.storage.get_user(user_id) or user
+                    result["level_up"] = bool(result.get("player_level_up"))
+                    result["chaos_state"] = {
+                        "rift_stage": user.get("rift_stage", 0),
+                        "chaos_energy": user.get("chaos_energy", 0),
+                        "artifact_state": user.get("artifact_chaos_state", "dormant"),
+                        "consecutive_errors": user.get("consecutive_errors", 0),
+                    }
+                    result["transfer_task"] = None
+                    return result
+
+        if user.get("in_boss_battle") and not is_transfer:
+            from core.boss_run import process_boss_answer
+
+            result = process_boss_answer(self.storage, self.score_manager, user_id, str(answer))
+            if not result.get("error"):
+                user = self.storage.get_user(user_id) or user
+                result["level_up"] = False
+                result["chaos_state"] = {
+                    "rift_stage": user.get("rift_stage", 0),
+                    "chaos_energy": user.get("chaos_energy", 0),
+                    "artifact_state": user.get("artifact_chaos_state", "dormant"),
+                    "consecutive_errors": user.get("consecutive_errors", 0),
+                }
+                result["transfer_task"] = None
+                return result
         
         # 🔹 Обновляем статистику ошибок (Chaos System)
         if is_correct:
@@ -271,15 +306,18 @@ class ChislyandiaEngine:
         # 🔹 Генерируем задачу-перенос если нужна (ошибка + 2+ подряд + НЕ уже перенос)
         transfer_task = None
         if not is_correct and not is_transfer and user["consecutive_errors"] >= 2:
-            # 🔹 Создаём заглушку оригинальной задачи (в реальности брать из истории)
-            original_task = {
-                "id": task_id,
-                "question": f"Задача {task_id}",
-                "correct_answer": str(expected_answer),
-                "score": base_score,
-                "island": island_id or "unknown",
-                "operation_type": operation_type or "unknown"
-            }
+            from core.task_loader import get_task_by_id
+
+            original_task = get_task_by_id(task_id, island_id)
+            if not original_task:
+                original_task = {
+                    "id": task_id,
+                    "question": f"Задача {task_id}",
+                    "correct_answer": str(expected_answer),
+                    "score": base_score,
+                    "island": island_id or "unknown",
+                    "operation_type": operation_type or "unknown",
+                }
             transfer_task = self._generate_transfer_task(original_task, user)
         
         # 🔹 Сообщение от персонажа
@@ -583,10 +621,50 @@ class ChislyandiaEngine:
         """Оплатить содержание замка"""
         return self.castle.pay_upkeep(user_id, days)
 
+    def start_level_run(self, user_id: str, world_id: str) -> Dict[str, Any]:
+        """Старт структурированного забега по острову (как enter_level в TG)."""
+        from core.level_run import start_level_run
+
+        return start_level_run(self.storage, user_id, world_id)
+
+    def start_boss_run(self, user_id: str, boss_id: Optional[str] = None) -> Dict[str, Any]:
+        from core.boss_run import start_boss_run
+
+        return start_boss_run(self.storage, user_id, boss_id)
+
+    def get_boss_state(self, user_id: str) -> Dict[str, Any]:
+        from core.boss_run import get_boss_state
+
+        user = self.storage.get_user(user_id)
+        if not user:
+            return {"error": "Игрок не найден"}
+        state = get_boss_state(user)
+        if not state:
+            return {"active": False}
+        return {"active": True, **state}
+
+    def exit_boss_run(self, user_id: str) -> Dict[str, Any]:
+        from core.boss_run import exit_boss_run
+
+        return exit_boss_run(self.storage, user_id)
+
     def get_random_task(self, user_id: str, world: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Выдать случайную задачу — единый источник data/worlds/ (как TG)."""
         from core.task_loader import pick_task_for_user
         return pick_task_for_user(self.storage, user_id, world)
+
+    def get_worlds(self, user_id: str) -> Dict[str, Any]:
+        """Каталог миров с учётом unlocked_zones игрока."""
+        from core.progression import list_worlds_for_user
+
+        user = self.storage.get_user(user_id)
+        if not user:
+            return {"error": "Игрок не найден"}
+        return {
+            "user_id": user_id,
+            "unlocked_zones": user.get("unlocked_zones", ["addition"]),
+            "worlds": list_worlds_for_user(user),
+        }
 
     def resolve_task_answer(
         self,

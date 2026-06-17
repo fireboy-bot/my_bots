@@ -83,6 +83,83 @@ def get_player_profile(user_id):
         return jsonify({"error": str(e)}), 500
 
 
+# 🔹 МИРЫ / ОСТРОВА
+@app.route('/api/game/worlds/<user_id>')
+def get_worlds(user_id):
+    """[GET] Каталог миров — ядро progression."""
+    try:
+        result = engine.get_worlds(user_id)
+        if result.get("error"):
+            return jsonify(result), 404
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[ERROR] get_worlds: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/game/level/start', methods=['POST'])
+def start_level():
+    """[POST] Старт забега по острову — 10 задач как в Telegram."""
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        user_id = data.get('user_id')
+        world = data.get('world')
+
+        if not user_id or not world:
+            return jsonify({"error": "user_id and world required"}), 400
+
+        result = engine.start_level_run(str(user_id), str(world))
+        if result.get("error"):
+            status = 404 if result["error"] == "Игрок не найден" else 403
+            return jsonify(result), status
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[ERROR] start_level: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/game/boss/start', methods=['POST'])
+def start_boss():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        user_id = data.get('user_id')
+        boss_id = data.get('boss_id')
+
+        if not user_id:
+            return jsonify({"error": "user_id required"}), 400
+
+        result = engine.start_boss_run(str(user_id), str(boss_id) if boss_id else None)
+        if result.get("error"):
+            status = 404 if result["error"] == "Игрок не найден" else 403
+            return jsonify(result), status
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[ERROR] start_boss: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/game/boss/state/<user_id>')
+def boss_state(user_id):
+    try:
+        return jsonify(engine.get_boss_state(user_id))
+    except Exception as e:
+        logger.error(f"[ERROR] boss_state: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/game/boss/exit', methods=['POST'])
+def exit_boss():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify({"error": "user_id required"}), 400
+        return jsonify(engine.exit_boss_run(str(user_id)))
+    except Exception as e:
+        logger.error(f"[ERROR] exit_boss: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # 🔹 ЗАДАЧА — без изменений
 @app.route('/api/game/task')
 def get_task():
@@ -96,6 +173,8 @@ def get_task():
         
         task = engine.get_random_task(user_id, world)
         if not task:
+            if world:
+                return jsonify({"error": "World locked or not found"}), 403
             return jsonify({"error": "No tasks available"}), 404
         
         return jsonify(task)

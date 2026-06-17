@@ -2,19 +2,16 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1e1b4b" />
     <meta name="description" content="🎮 Числяндия — образовательная математическая игра для детей" />
-    <title>🎮 Числяндия</title>
+    <title>Числяндия</title>
     
-    <!-- 🔹 Шрифты -->
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
-    
-    <!-- 🔹 Глобальные стили -->
     <style>
       * {
         box-sizing: border-box;
         -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none;
         user-select: none;
       }
       
@@ -33,8 +30,8 @@
       }
       
       #root {
-        position: relative !important;
-        background: transparent !important;
+        position: relative;
+        z-index: 1;
         min-height: 100vh;
       }
       
@@ -68,7 +65,7 @@
   </head>
   <body>
     <!-- 🔹 React App Root -->
-    <div id="root"></div>
+    <div id="root"><p style="margin:0;padding:40px;text-align:center;color:#e2e8f0;font-family:system-ui,sans-serif">Загрузка Числяндии...</p></div>
     
     <!-- 🔹 Точка входа -->
     <script type="module" src="/src/main.jsx"></script>

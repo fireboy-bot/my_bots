@@ -28,7 +28,7 @@ export function MenuScreen({ userId = "331113480" }) {
   }, [userId]);
 
   // 🔹 Переходы
-  const handleStartGame = () => navigate(`/game/task/${userId}`);
+  const handleStartGame = () => navigate(`/game/worlds/${userId}`);
   const handleCastle = () => navigate(`/game/castle/${userId}`);
   const handleBank = () => navigate(`/game/bank/${userId}`);
   const handleShop = () => navigate(`/game/shop/${userId}`);

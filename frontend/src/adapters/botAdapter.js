@@ -120,6 +120,33 @@ export const botApi = {
     }
   },
 
+  // 🔹 Каталог миров / островов
+  async getWorlds(userId) {
+    return await apiFetch(`/api/game/worlds/${encodeURIComponent(userId)}`);
+  },
+
+  // 🔹 Старт забега по острову (10 задач)
+  async startLevel(userId, world) {
+    return await apiFetch('/api/game/level/start', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, world }),
+    });
+  },
+
+  async startBoss(userId, bossId) {
+    return await apiFetch('/api/game/boss/start', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, boss_id: bossId }),
+    });
+  },
+
+  async exitBoss(userId) {
+    return await apiFetch('/api/game/boss/exit', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    });
+  },
+
   // 🔹 Банк
   async getBankInfo(userId) {
     try {

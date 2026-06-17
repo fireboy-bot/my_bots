@@ -1,0 +1,120 @@
+.boss-screen {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 24px 20px 100px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #e2e8f0;
+}
+
+.boss-screen--loading {
+  align-items: center;
+  justify-content: center;
+}
+
+.boss-screen__header {
+  text-align: center;
+}
+
+.boss-screen__emoji {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.boss-screen__header h1 {
+  margin: 0;
+  font-size: 26px;
+  background: linear-gradient(135deg, #ef4444, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.boss-screen__header p {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.boss-hp {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  font-size: 22px;
+}
+
+.boss-screen__progress {
+  text-align: center;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.boss-screen__card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 2px solid rgba(239, 68, 68, 0.35);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.boss-screen__question {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.boss-screen__input {
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.boss-screen__submit {
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.boss-screen__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.boss-screen__feedback {
+  text-align: center;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.boss-screen__feedback--success {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.boss-screen__feedback--error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fecaca;
+}
+
+.boss-screen__exit {
+  align-self: center;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  cursor: pointer;
+}

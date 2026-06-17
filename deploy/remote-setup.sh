@@ -4,6 +4,7 @@ set -euo pipefail
 REMOTE_DIR="/opt/chislyandia"
 
 mkdir -p "$REMOTE_DIR"
+rm -rf "$REMOTE_DIR/frontend/dist"
 tar -xzf /tmp/chislyandia-deploy.tgz -C "$REMOTE_DIR"
 chown -R juliabot:juliabot "$REMOTE_DIR"
 mkdir -p "$REMOTE_DIR/data" "$REMOTE_DIR/logs"

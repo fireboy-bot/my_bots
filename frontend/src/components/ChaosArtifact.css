@@ -12,7 +12,7 @@
   width: 100%;
   max-width: 240px;
   position: relative;
-  overflow: visible; /* 🔹 для частиц снаружи */
+  overflow: hidden;
   transition: all var(--transition-delay, 0.2s) ease;
 }
 
@@ -22,12 +22,12 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 140%;
-  height: 140%;
+  width: 110%;
+  height: 110%;
   border-radius: 50%;
   background: radial-gradient(circle, var(--glow-color) 0%, transparent 65%);
-  opacity: 0.35;
-  filter: blur(25px);
+  opacity: 0.25;
+  filter: blur(18px);
   pointer-events: none;
   animation: glowPulse 3.5s ease-in-out infinite;
   transition: opacity var(--transition-delay, 0.2s) ease;

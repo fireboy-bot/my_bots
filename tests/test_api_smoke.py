@@ -32,6 +32,145 @@ def test_profile_alias_progress(client, seeded_user, user_id):
         assert "unlocked_zones" in data
 
 
+def test_get_worlds(client, seeded_user, user_id):
+    r = client.get(f"/api/game/worlds/{user_id}")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["user_id"] == user_id
+    worlds = data.get("worlds", [])
+    assert len(worlds) >= 4
+    addition = next(w for w in worlds if w["id"] == "addition")
+    assert addition["unlocked"] is True
+    locked = [w for w in worlds if not w["unlocked"]]
+    assert len(locked) >= 1
+
+
+def test_get_task_locked_world(client, seeded_user, user_id):
+    r = client.get(f"/api/game/task?user_id={user_id}&world=logic_world")
+    assert r.status_code == 403
+
+
+def test_level_start_and_progress(client, seeded_user, user_id):
+    r = client.post(
+        "/api/game/level/start",
+        data=json.dumps({"user_id": user_id, "world": "addition"}),
+        content_type="application/json",
+    )
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["task"]["id"]
+    assert data["run_progress"]["current"] == 1
+    assert data["run_progress"]["total"] == 10
+
+    task = data["task"]
+    r_answer = client.post(
+        "/api/game/answer",
+        data=json.dumps(
+            {
+                "user_id": user_id,
+                "answer": task["correct_answer"],
+                "task_id": task["id"],
+                "island_id": "addition",
+                "operation_type": task.get("operation_type", "2digit_add"),
+            }
+        ),
+        content_type="application/json",
+    )
+    assert r_answer.status_code == 200
+    result = r_answer.get_json()
+    assert result["correct"] is True
+    assert result.get("next_task") or result.get("run_progress")
+
+
+def test_level_complete_unlocks_next_island(client, seeded_user, user_id):
+    import core.level_run as level_run
+
+    original = level_run.ISLAND_TASK_COUNT
+    level_run.ISLAND_TASK_COUNT = 2
+    try:
+        r = client.post(
+            "/api/game/level/start",
+            data=json.dumps({"user_id": user_id, "world": "addition"}),
+            content_type="application/json",
+        )
+        task = r.get_json()["task"]
+
+        for _ in range(2):
+            r_answer = client.post(
+                "/api/game/answer",
+                data=json.dumps(
+                    {
+                        "user_id": user_id,
+                        "answer": task["correct_answer"],
+                        "task_id": task["id"],
+                        "island_id": "addition",
+                        "operation_type": task.get("operation_type", "2digit_add"),
+                    }
+                ),
+                content_type="application/json",
+            )
+            result = r_answer.get_json()
+            if result.get("island_complete"):
+                break
+            task = result.get("next_task") or task
+
+        assert result.get("island_complete") is True
+        assert result.get("boss_pending", {}).get("id") == "null_void"
+        assert result.get("unlocked_zone") is None
+        profile = client.get(f"/api/player/{user_id}/profile").get_json()
+        assert "subtraction" not in profile.get("unlocked_zones", [])
+    finally:
+        level_run.ISLAND_TASK_COUNT = original
+
+
+def test_boss_start_and_defeat(client, seeded_user, user_id):
+    import core.level_run as level_run
+
+    original = level_run.ISLAND_TASK_COUNT
+    level_run.ISLAND_TASK_COUNT = 1
+    try:
+        client.post(
+            "/api/game/level/start",
+            data=json.dumps({"user_id": user_id, "world": "addition"}),
+            content_type="application/json",
+        )
+        r = client.post(
+            "/api/game/boss/start",
+            data=json.dumps({"user_id": user_id, "boss_id": "null_void"}),
+            content_type="application/json",
+        )
+        assert r.status_code == 200
+        boss = r.get_json()
+        task = boss["task"]
+
+        for _ in range(6):
+            r_answer = client.post(
+                "/api/game/answer",
+                data=json.dumps(
+                    {
+                        "user_id": user_id,
+                        "answer": task["correct_answer"],
+                        "task_id": task["id"],
+                        "expected_answer": task["correct_answer"],
+                        "island_id": "null_void",
+                        "operation_type": "boss",
+                    }
+                ),
+                content_type="application/json",
+            )
+            result = r_answer.get_json()
+            if result.get("boss_defeated"):
+                break
+            task = result.get("next_task") or task
+
+        assert result.get("boss_defeated") is True
+        profile = client.get(f"/api/player/{user_id}/profile").get_json()
+        assert "null_void" in profile.get("defeated_bosses", [])
+        assert "subtraction" in profile.get("unlocked_zones", [])
+    finally:
+        level_run.ISLAND_TASK_COUNT = original
+
+
 def test_get_task_requires_user_id(client):
     r = client.get("/api/game/task")
     assert r.status_code == 400
@@ -64,6 +203,37 @@ def test_get_task_and_answer_correct(client, seeded_user, user_id):
     result = r_answer.get_json()
     assert result["correct"] is True
     assert result["new_balance"] > balance_before
+
+
+def test_transfer_task_has_real_question(client, seeded_user, user_id):
+    """После 2 ошибок transfer-задача должна содержать нормальный вопрос, не «Задача addition_N»."""
+    r_task = client.get(f"/api/game/task?user_id={user_id}&world=addition")
+    task = r_task.get_json()
+
+    payload = {
+        "user_id": user_id,
+        "answer": "__wrong__",
+        "task_id": task["id"],
+        "island_id": "addition",
+        "operation_type": task.get("operation_type", "2digit_add"),
+    }
+
+    for _ in range(2):
+        r = client.post(
+            "/api/game/check_answer",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert r.status_code == 200
+        result = r.get_json()
+        assert result["correct"] is False
+
+    transfer = result.get("transfer_task")
+    assert transfer is not None
+    question = transfer.get("question", "")
+    assert question
+    assert not question.startswith("Задача addition_")
+    assert "+" in question or "×" in question or "÷" in question or "-" in question
 
 
 def test_answer_wrong_penalty(client, seeded_user, user_id):

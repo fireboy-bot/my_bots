@@ -7,6 +7,7 @@ export function TaskArea({
   feedback, 
   processing, 
   chaosState,
+  runProgress,
   onAnswerSubmit,
   onInputChange,
   answerInput,
@@ -18,13 +19,14 @@ export function TaskArea({
   const [flashState, setFlashState] = useState(null); // 'correct' | 'error' | null
 
   const activeTask = transferTask || task;
+  const inputDisabled = processing || feedback?.type === 'success' || feedback?.type === 'error';
   
   // 🔹 Автофокус при смене задачи
   useEffect(() => {
-    if (activeTask && inputRef.current && !processing && !feedback) {
+    if (activeTask && inputRef.current && !inputDisabled) {
       inputRef.current.focus();
     }
-  }, [activeTask, processing, feedback]);
+  }, [activeTask, inputDisabled]);
 
   // 🔹 Запуск анимации вспышки при получении фидбека
   useEffect(() => {
@@ -41,7 +43,7 @@ export function TaskArea({
   }, [feedback]);
   
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !processing && !feedback) {
+    if (e.key === 'Enter' && !inputDisabled) {
       onAnswerSubmit();
     }
   };
@@ -60,8 +62,26 @@ export function TaskArea({
       <div 
         ref={cardRef}
         className={`task-card ${focusedClass} ${flashClass}`} 
-        data-task-id={task?.id || 'unknown'}
+        data-task-id={activeTask?.id || task?.id || 'unknown'}
       >
+        {transferTask && (
+          <div className="transfer-banner">
+            <span className="transfer-banner__title">🌌 Задача-перенос</span>
+            {feedback?.type === 'transfer' && (
+              <span className="transfer-banner__message">{feedback.text}</span>
+            )}
+            {(feedback?.hint || transferTask.hint) && (
+              <span className="transfer-banner__hint">{feedback?.hint || transferTask.hint}</span>
+            )}
+          </div>
+        )}
+
+        {runProgress && (
+          <div className="task-progress">
+            Задача {runProgress.current} из {runProgress.total}
+          </div>
+        )}
+
         <p className="task-question">{activeTask?.question}</p>
         
         <input
@@ -76,13 +96,13 @@ export function TaskArea({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           placeholder="Введи ответ..."
-          disabled={processing || !!feedback}
+          disabled={inputDisabled}
         />
         
         <button 
           className="btn-submit" 
           onClick={onAnswerSubmit}
-          disabled={!answerInput.trim() || processing || !!feedback}
+          disabled={!answerInput.trim() || inputDisabled}
         >
           {processing ? '⏳ Проверка...' : '✅ Ответить'}
         </button>
