@@ -363,6 +363,27 @@ def test_castle_info(client, seeded_user, user_id):
     assert "decoration_upgrades" in data
 
 
+def test_castle_upkeep_with_null_paid_until(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["defeated_bosses"] = ["final_boss"]
+    user["castle_data"] = {"decorations": [], "upkeep_paid_until": None}
+    user["score_balance"] = 500
+    storage.save_user(user_id, user)
+
+    r = client.post(
+        f"/api/castle/{user_id}/upkeep",
+        data=json.dumps({"days": 1}),
+        content_type="application/json",
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body.get("success") is True
+
+    castle = client.get(f"/api/castle/{user_id}").get_json()
+    assert castle["bonuses_active"] is True
+    assert castle["upkeep_paid_until"] > 0
+
+
 def test_artifacts_list(client, seeded_user, user_id):
     r = client.get(f"/api/artifacts/{user_id}")
     assert r.status_code == 200

@@ -47,13 +47,18 @@ class CastleEngine:
         
         # Получаем данные замка
         castle_data = user.get("castle_data", {})
-        upkeep_paid_until = castle_data.get("upkeep_paid_until", 0) or 0
+        upkeep_paid_until = castle_data.get("upkeep_paid_until") or 0
         
-        # ✅ КОНВЕРТИРУЕМ СТРОКУ В FLOAT (если это строка)
+        # ✅ КОНВЕРТИРУЕМ СТРОКУ / None В FLOAT
         if isinstance(upkeep_paid_until, str):
             try:
                 upkeep_paid_until = float(upkeep_paid_until)
             except (ValueError, TypeError):
+                upkeep_paid_until = 0
+        else:
+            try:
+                upkeep_paid_until = float(upkeep_paid_until)
+            except (TypeError, ValueError):
                 upkeep_paid_until = 0
         
         # Проверяем upkeep
@@ -254,19 +259,23 @@ class CastleEngine:
         
         if not success:
             return (False, message)
+
+        user = self.storage.get_user(user_id) or user
         
         # Обновляем upkeep_paid_until
-        castle_data = user.get("castle_data", {})
+        castle_data = dict(user.get("castle_data") or {})
         now = datetime.now(timezone.utc).timestamp()
         
-        # Если upkeep уже оплачен — добавляем дни к текущей дате
-        current_paid_until = castle_data.get("upkeep_paid_until", 0)
-        
-        # ✅ КОНВЕРТИРУЕМ СТРОКУ В FLOAT
+        current_paid_until = castle_data.get("upkeep_paid_until") or 0
         if isinstance(current_paid_until, str):
             try:
                 current_paid_until = float(current_paid_until)
             except (ValueError, TypeError):
+                current_paid_until = 0
+        else:
+            try:
+                current_paid_until = float(current_paid_until)
+            except (TypeError, ValueError):
                 current_paid_until = 0
         
         if current_paid_until > now:
@@ -276,7 +285,8 @@ class CastleEngine:
         
         castle_data["upkeep_paid_until"] = new_paid_until
         user["castle_data"] = castle_data
-        self.storage.save_user(user_id, user)
+        if not self.storage.save_user(user_id, user):
+            return (False, "❌ Не удалось сохранить upkeep замка")
         
         logger.info(f"🏰 Upkeep оплачен: user_id={user_id}, days={days}, until={new_paid_until}")
         

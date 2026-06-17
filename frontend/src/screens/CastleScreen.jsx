@@ -99,7 +99,6 @@ export function CastleScreen({ userId = "331113480", onBack }) {
       
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
-        // Обновляем данные
         const [castle, profile] = await Promise.all([
           botApi.getCastleInfo(userId),
           botApi.getPlayerProfile(userId)
@@ -108,7 +107,7 @@ export function CastleScreen({ userId = "331113480", onBack }) {
         setPlayerStats(profile);
         setVladimirPhrase(getVladimirPhrase('full', castle));
       } else {
-        setMessage({ type: 'error', text: result.message });
+        setMessage({ type: 'error', text: result.message || result.error || 'Не удалось оплатить upkeep' });
       }
     } catch (error) {
       console.error('❌ Error paying upkeep:', error);
@@ -361,9 +360,9 @@ export function CastleScreen({ userId = "331113480", onBack }) {
         <button 
           className="pay-btn"
           onClick={handlePayUpkeep}
-          disabled={processing || (playerStats?.score_balance || 0) < upkeepDays * 100}
+          disabled={processing || (playerStats?.score_balance || 0) < upkeepDays * 50}
         >
-          {processing ? '⏳ Обработка...' : `💰 Оплатить ${(upkeepDays * 100).toLocaleString()} 🪙`}
+          {processing ? '⏳ Обработка...' : `💰 Оплатить ${(upkeepDays * 50).toLocaleString()} 🪙`}
         </button>
       </div>
 
