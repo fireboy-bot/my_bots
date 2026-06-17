@@ -278,11 +278,7 @@ export function TaskScreen({ userId = "331113480", worldId, onBack }) {
           hint: result.transfer_task.hint || 'Тот же пример — другой порядок чисел!',
         });
       } else if (result.island_complete) {
-        setFeedback({
-          type: 'success',
-          text: result.message,
-          reward: result.completion_bonus,
-        });
+        setFeedback(null);
         setRunProgress(null);
         pendingActionRef.current = () => {
           if (result.boss_pending?.id) {

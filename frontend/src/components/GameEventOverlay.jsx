@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './GameEventOverlay.css';
 
 const ZONE_NAMES = {
@@ -15,11 +17,21 @@ function zoneLabel(id) {
 }
 
 export function GameEventOverlay({ event, onContinue }) {
+  useEffect(() => {
+    if (!event) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [event]);
+
   if (!event) return null;
 
+  const overlay = (() => {
   if (event.type === 'level_up') {
     return (
-      <div className="game-event-overlay" role="dialog" aria-live="polite">
+      <div className="game-event-overlay" role="dialog" aria-modal="true" aria-live="polite">
         <div className="game-event-card game-event-card--level">
           <div className="game-event-card__icon">⭐</div>
           <h2>Новый уровень!</h2>
@@ -35,7 +47,7 @@ export function GameEventOverlay({ event, onContinue }) {
 
   if (event.type === 'island_complete') {
     return (
-      <div className="game-event-overlay" role="dialog" aria-live="polite">
+      <div className="game-event-overlay" role="dialog" aria-modal="true" aria-live="polite">
         <div className="game-event-card game-event-card--victory">
           <div className="game-event-card__icon">🏆</div>
           <h2>Остров пройден!</h2>
@@ -66,7 +78,7 @@ export function GameEventOverlay({ event, onContinue }) {
 
   if (event.type === 'boss_victory') {
     return (
-      <div className="game-event-overlay" role="dialog" aria-live="polite">
+      <div className="game-event-overlay" role="dialog" aria-modal="true" aria-live="polite">
         <div className="game-event-card game-event-card--boss">
           <div className="game-event-card__icon">🎉</div>
           <h2>Победа!</h2>
@@ -83,4 +95,7 @@ export function GameEventOverlay({ event, onContinue }) {
   }
 
   return null;
+  })();
+
+  return createPortal(overlay, document.body);
 }

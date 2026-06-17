@@ -70,6 +70,26 @@ class ChislyandiaEngine:
             return "awakened"
         else:
             return "dormant"
+
+    def _apply_chaos_tick(self, user: Dict[str, Any], is_correct: bool) -> Dict[str, Any]:
+        """Обновляет энергию хаоса и стадию разлома после ответа."""
+        if is_correct:
+            user["consecutive_errors"] = 0
+            user["chaos_energy"] = max(0, user.get("chaos_energy", 0) - 10)
+        else:
+            user["consecutive_errors"] = user.get("consecutive_errors", 0) + 1
+            user["chaos_energy"] = min(100, user.get("chaos_energy", 0) + 20)
+
+        rift_stage = self._calculate_rift_stage(user["consecutive_errors"])
+        artifact_state = self._get_artifact_chaos_state(user["chaos_energy"], rift_stage)
+        user["rift_stage"] = rift_stage
+        user["artifact_chaos_state"] = artifact_state
+        return {
+            "rift_stage": rift_stage,
+            "chaos_energy": user["chaos_energy"],
+            "artifact_state": artifact_state,
+            "consecutive_errors": user["consecutive_errors"],
+        }
     
     def _generate_options(self, correct: int, min_val: int, max_val: int, count: int = 4) -> List[str]:
         """Генерирует варианты ответов (вспомогательная функция)."""
@@ -228,13 +248,10 @@ class ChislyandiaEngine:
                 result = process_level_answer(self.storage, self.score_manager, user_id, is_correct)
                 if not result.get("error"):
                     user = self.storage.get_user(user_id) or user
+                    chaos_state = self._apply_chaos_tick(user, is_correct)
+                    self.storage.save_user(user_id, user)
                     result["level_up"] = bool(result.get("player_level_up"))
-                    result["chaos_state"] = {
-                        "rift_stage": user.get("rift_stage", 0),
-                        "chaos_energy": user.get("chaos_energy", 0),
-                        "artifact_state": user.get("artifact_chaos_state", "dormant"),
-                        "consecutive_errors": user.get("consecutive_errors", 0),
-                    }
+                    result["chaos_state"] = chaos_state
                     result["transfer_task"] = None
                     return result
 
@@ -244,27 +261,17 @@ class ChislyandiaEngine:
             result = process_boss_answer(self.storage, self.score_manager, user_id, str(answer))
             if not result.get("error"):
                 user = self.storage.get_user(user_id) or user
+                chaos_state = self._apply_chaos_tick(user, result.get("correct", is_correct))
+                self.storage.save_user(user_id, user)
                 result["level_up"] = False
-                result["chaos_state"] = {
-                    "rift_stage": user.get("rift_stage", 0),
-                    "chaos_energy": user.get("chaos_energy", 0),
-                    "artifact_state": user.get("artifact_chaos_state", "dormant"),
-                    "consecutive_errors": user.get("consecutive_errors", 0),
-                }
+                result["chaos_state"] = chaos_state
                 result["transfer_task"] = None
                 return result
         
         # 🔹 Обновляем статистику ошибок (Chaos System)
-        if is_correct:
-            user["consecutive_errors"] = 0
-            user["chaos_energy"] = max(0, user.get("chaos_energy", 0) - 10)
-        else:
-            user["consecutive_errors"] = user.get("consecutive_errors", 0) + 1
-            user["chaos_energy"] = min(100, user.get("chaos_energy", 0) + 20)
-        
-        # 🔹 Пересчитываем стадию Разлома и состояние Артефакта
-        rift_stage = self._calculate_rift_stage(user["consecutive_errors"])
-        artifact_state = self._get_artifact_chaos_state(user["chaos_energy"], rift_stage)
+        chaos_state = self._apply_chaos_tick(user, is_correct)
+        rift_stage = chaos_state["rift_stage"]
+        artifact_state = chaos_state["artifact_state"]
         
         # 🔹 Рассчитываем награду (с учётом анти-абуза)
         base_score = self._get_task_reward(task_id, user) if is_correct else 0
@@ -336,8 +343,6 @@ class ChislyandiaEngine:
         level_up = self._check_level_progress(user_id, user)
         
         # 🔹 Сохраняем пользователя с новыми полями Хаоса
-        user["rift_stage"] = rift_stage
-        user["artifact_chaos_state"] = artifact_state
         if is_transfer and is_correct:
             user["transfer_tasks_completed"] = user.get("transfer_tasks_completed", 0) + 1
         
@@ -368,12 +373,7 @@ class ChislyandiaEngine:
             "reward": reward,
             "message": message,
             "level_up": level_up,
-            "chaos_state": {
-                "rift_stage": rift_stage,
-                "chaos_energy": user["chaos_energy"],
-                "artifact_state": artifact_state,
-                "consecutive_errors": user["consecutive_errors"]
-            },
+            "chaos_state": chaos_state,
             "transfer_task": transfer_task,
             "new_balance": user.get("score_balance", 0),
             "new_total_score": user.get("total_score", 0)

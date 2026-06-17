@@ -80,6 +80,38 @@ def test_level_start_and_progress(client, seeded_user, user_id):
     result = r_answer.get_json()
     assert result["correct"] is True
     assert result.get("next_task") or result.get("run_progress")
+    chaos = result.get("chaos_state")
+    assert chaos is not None
+
+
+def test_level_run_reduces_chaos_on_correct(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["chaos_energy"] = 60
+    user["consecutive_errors"] = 2
+    user["rift_stage"] = 1
+    storage.save_user(user_id, user)
+    r = client.post(
+        "/api/game/level/start",
+        data=json.dumps({"user_id": user_id, "world": "addition"}),
+        content_type="application/json",
+    )
+    task = r.get_json()["task"]
+    r_answer = client.post(
+        "/api/game/answer",
+        data=json.dumps(
+            {
+                "user_id": user_id,
+                "answer": task["correct_answer"],
+                "task_id": task["id"],
+                "island_id": "addition",
+                "operation_type": task.get("operation_type", "2digit_add"),
+            }
+        ),
+        content_type="application/json",
+    )
+    chaos = r_answer.get_json()["chaos_state"]
+    assert chaos["chaos_energy"] == 50
+    assert chaos["consecutive_errors"] == 0
 
 
 def test_level_complete_unlocks_next_island(client, seeded_user, user_id):
