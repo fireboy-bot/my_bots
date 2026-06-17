@@ -93,22 +93,35 @@ export function AlchemyScreen({ userId = "331113480", onBack }) {
     }
     
     setProcessing(true);
+    setMessage(null);
     try {
       const result = await botApi.craftAlchemy(userId, itemId);
       if (result.success) {
-        setMessage({ type: 'success', text: result.message + (result.activation ? `\n\n${result.activation}` : '') });
-        const profile = await botApi.getPlayerProfile(userId);
-        setInventory(profile?.inventory || []);
-        setPlayerStats(profile);
+        const text = result.message + (result.activation ? `\n\n${result.activation}` : '');
+        setMessage({ type: 'success', text });
+        if (result.new_balance !== undefined) {
+          setPlayerStats((prev) => ({
+            ...prev,
+            score_balance: result.new_balance,
+            inventory: result.inventory ?? prev?.inventory,
+          }));
+        }
+        setInventory(result.inventory ?? inventory);
+        if (result.new_balance === undefined) {
+          const profile = await botApi.getPlayerProfile(userId);
+          setInventory(profile?.inventory || []);
+          setPlayerStats(profile);
+        }
       } else {
-        setMessage({ type: 'error', text: result.message });
+        setMessage({ type: 'error', text: result.message || '❌ Не удалось создать' });
       }
     } catch (e) {
       console.error('❌ Error:', e);
-      setMessage({ type: 'error', text: '⚠️ API недоступен. Перезапусти web/api_server.py' });
+      setMessage({ type: 'error', text: '⚠️ Ошибка API. Попробуй ещё раз' });
+    } finally {
+      setProcessing(false);
+      setTimeout(() => setMessage(null), 6000);
     }
-    setProcessing(false);
-    setTimeout(() => setMessage(null), 5000);
   };
 
   const handleBack = () => { if (onBack) onBack(); else navigate('/game/shop/' + userId); };
@@ -134,6 +147,13 @@ export function AlchemyScreen({ userId = "331113480", onBack }) {
       <div className="alchemy-tip">
         💀 <i>«ХА-ХА-ХА! Мои зелья работают всегда — даже если замок спит! Но рискни... если осмелишься!»</i>
       </div>
+
+      {playerStats && (
+        <div className="alchemy-balance">
+          💰 В кошельке: <strong>{(playerStats.score_balance ?? 0).toLocaleString('ru-RU')}</strong> золотых
+          <span className="alchemy-balance__hint"> (лавка списывает с кошелька, не из банка)</span>
+        </div>
+      )}
 
       {/* 🔹 СПИСОК РЕЦЕПТОВ */}
       <div className="alchemy-list">
@@ -178,7 +198,13 @@ export function AlchemyScreen({ userId = "331113480", onBack }) {
         })}
       </div>
 
-      {message && <div className={`message message--${message.type} alchemy-message`}>{message.text}</div>}
+      {message && (
+        <div className={`message message--${message.type} alchemy-message`}>
+          {message.text.split('\n').map((line, i) => (
+            <span key={i}>{line}{i < message.text.split('\n').length - 1 ? <br /> : null}</span>
+          ))}
+        </div>
+      )}
       
       <FloatingNav userId={userId} showBack={true} showMenu={true} showSettings={false} onBack={handleBack} theme="game" />
     </div>

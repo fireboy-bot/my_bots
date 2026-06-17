@@ -20,42 +20,21 @@ phrase_manager = PhraseManager()
 
 def get_all_items():
     """Возвращает все предметы"""
-    return SHOP_ITEMS
+    from core.alchemy import get_all_items as _core_get_all_items
+    return _core_get_all_items()
 
 
-ALCHEMY_RECIPES = {
-    "bravery_potion": {"cost_in_score": 150, "unlocks_after": "subtraction"},
-    "chaos_cup": {"cost_in_score": 250, "unlocks_after": "multiplication"},
-    "dice_of_fate": {"cost_in_score": 180, "unlocks_after": "division"},
-    "madness_potion": {"cost_in_score": 200, "unlocks_after": "completed_normal_game"}
-}
+ALCHEMY_RECIPES = None  # lazy — см. core.alchemy
+
+
+def _recipes():
+    from core.alchemy import ALCHEMY_RECIPES as recipes
+    return recipes
 
 
 def get_available_recipes(progress):
-    """Возвращает список рецептов, доступных для создания."""
-    available = []
-    unlocked_zones = set(progress.get("unlocked_zones", []))
-    completed_normal_game = progress.get("completed_normal_game", False)
-    
-    for item_id, recipe in ALCHEMY_RECIPES.items():
-        unlock_condition = recipe.get("unlocks_after", None)
-        is_unlocked = False
-        
-        if unlock_condition is None:
-            is_unlocked = True
-        elif unlock_condition == "subtraction":
-            is_unlocked = "subtraction" in unlocked_zones
-        elif unlock_condition == "multiplication":
-            is_unlocked = "multiplication" in unlocked_zones
-        elif unlock_condition == "division":
-            is_unlocked = "division" in unlocked_zones
-        elif unlock_condition == "completed_normal_game":
-            is_unlocked = completed_normal_game
-            
-        if is_unlocked:
-            available.append(item_id)
-            
-    return available
+    from core.alchemy import get_available_recipes as _fn
+    return _fn(progress)
 
 
 def get_alchemy_inline_keyboard(available_items, current_balance):
@@ -65,7 +44,7 @@ def get_alchemy_inline_keyboard(available_items, current_balance):
     for item_id in available_items:
         all_items = get_all_items()
         item = all_items[item_id]
-        recipe = ALCHEMY_RECIPES[item_id]
+        recipe = _recipes()[item_id]
         cost_in_score = item.get("cost_in_score", recipe["cost_in_score"])
         can_afford = current_balance >= cost_in_score
         
@@ -107,9 +86,9 @@ async def show_alchemy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     all_items = get_all_items()
     for item_id in available_recipes:
-        if item_id not in ALCHEMY_RECIPES:
+        if item_id not in _recipes():
             continue
-        recipe = ALCHEMY_RECIPES[item_id]
+        recipe = _recipes()[item_id]
         item = all_items[item_id]
         item_name = item["name"]
         description = item.get("description", "Особый артефакт.")
@@ -147,102 +126,18 @@ async def show_alchemy(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def execute_craft(user_id, item_id: str, storage, score_manager=None) -> tuple:
-    """Выполняет создание артефакта (async-обёртка для Telegram)."""
+    from core.alchemy import craft_alchemy_item
     return craft_alchemy_item(user_id, item_id, storage, score_manager)
 
 
 def craft_alchemy_item(user_id, item_id: str, storage, score_manager=None) -> tuple:
-    """Синхронный крафт — для web/API и ядра."""
-    progress = storage.get_user(user_id) or {}
-    inventory = progress.get("inventory", [])
-    
-    current_balance = progress.get("score_balance", 0)
-    
-    if item_id not in ALCHEMY_RECIPES:
-        logger.error(f"❌ Рецепт не найден: {item_id}")
-        return False, "❌ Рецепт не найден!"
-    
-    all_items = get_all_items()
-    
-    if item_id not in all_items:
-        logger.error(f"❌ Предмет не найден в SHOP_ITEMS: {item_id}")
-        return False, "❌ Предмет не найден!"
-    
-    item_data = all_items[item_id]
-    cost_in_score = item_data.get("cost_in_score", ALCHEMY_RECIPES[item_id]["cost_in_score"])
-    item_type = item_data.get("type", "one_time_risk")
-    
-    if current_balance < cost_in_score:
-        return False, f"❌ Недостаточно золотых (нужно {cost_in_score}, есть {current_balance})!"
-    
-    if item_type in ["one_time_risk", "level_wide_risk"] and item_id in inventory:
-        return False, "❌ Артефакт уже создан!"
-    
-    if item_id not in get_available_recipes(progress):
-        return False, "❌ Рецепт ещё не открыт!"
-    
-    if score_manager:
-        success, message = score_manager.spend_score(
-            user_id=user_id,
-            amount=cost_in_score,
-            reason="alchemy_craft",
-            context=item_id
-        )
-        if not success:
-            return False, message
-        progress = storage.get_user(user_id) or progress
-    else:
-        progress["score_balance"] = current_balance - cost_in_score
-    
-    inventory = progress.get("inventory", [])
-    if item_id not in inventory:
-        inventory.append(item_id)
-        progress["inventory"] = inventory
-    
-    storage.save_user(user_id, progress)
-    
-    logger.info(f"⚗️ Пользователь {user_id} создал {item_id} за {cost_in_score} золотых")
-    
-    return True, f"✨ Создано: {item_data['name']}!"
+    from core.alchemy import craft_alchemy_item as _craft
+    return _craft(user_id, item_id, storage, score_manager)
 
 
 def get_alchemy_activation_message(item_id: str) -> str:
-    """Возвращает сообщение об активации эффекта алхимического артефакта."""
-    if item_id not in get_all_items():
-        return ""
-    
-    all_items = get_all_items()
-    item_data = all_items[item_id]
-    item_name = item_data["name"]
-    item_effect = item_data.get("effect")
-    item_type = item_data.get("type")
-    
-    message = f"✨ Ты создала **{item_name}**!\n\n"
-    
-    if item_type == "one_time_risk":
-        message += "⚠️ *Эффект сработает на следующей задаче!*\n\n"
-        if item_effect == "risk_reward":
-            success_bonus = item_data.get("success_bonus", 0)
-            failure_penalty = item_data.get("failure_penalty", 0)
-            message += f"💣 *Эффект активирован!* Следующая задача: +{success_bonus} за успех, {failure_penalty} за ошибку!"
-        elif item_effect == "chaos":
-            success_reward = item_data.get("success_reward", 0)
-            failure_penalty = item_data.get("failure_penalty", 0)
-            message += f"💣 *Эффект активирован!* Следующая задача: +{success_reward} за успех, {failure_penalty} за ошибку!"
-        elif item_effect == "dice_roll":
-            message += "🎲 *Эффект активирован!* Перед следующей задачей будет брошен кубик судьбы!"
-    elif item_type == "level_wide_risk":
-        message += "🌀 *Эффект действует до конца уровня!*\n\n"
-        if item_effect == "inverted_scoring":
-            error_reward = item_data.get("error_reward", 0)
-            correct_reward = item_data.get("correct_reward", 0)
-            cancel_cost = item_data.get("cancel_cost", 0)
-            message += f"🌀 *Эффект активирован!* На этом уровне: ошибки = +{error_reward}, правильные = {correct_reward}."
-            message += f"\nОтменить можно за {cancel_cost} золотых."
-    
-    message += "\n\n💡 Артефакт добавлен в инвентарь!"
-    
-    return message
+    from core.alchemy import get_alchemy_activation_message as _msg
+    return _msg(item_id)
 
 
 async def handle_alchemy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

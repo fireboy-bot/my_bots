@@ -143,7 +143,7 @@ def test_boss_start_and_defeat(client, seeded_user, user_id):
         boss = r.get_json()
         task = boss["task"]
 
-        for _ in range(6):
+        for _ in range(12):
             r_answer = client.post(
                 "/api/game/answer",
                 data=json.dumps(
@@ -334,3 +334,4 @@ def test_alchemy_craft_success(client, user_id):
     data = r.get_json()
     assert data["success"] is True
     assert "bravery_potion" in storage.get_user(uid).get("inventory", [])
+    assert data.get("new_balance") == 350

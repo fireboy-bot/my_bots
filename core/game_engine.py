@@ -711,12 +711,15 @@ class ChislyandiaEngine:
         return self.score_manager.artifact_manager.upgrade_artifact(user_id, artifact_id)
 
     def craft_alchemy(self, user_id: str, item_id: str) -> Dict[str, Any]:
-        """Создать алхимический предмет — та же логика, что в Telegram."""
-        from handlers.alchemy import craft_alchemy_item, get_alchemy_activation_message
+        """Создать алхимический предмет — ядро без Telegram."""
+        from core.alchemy import craft_alchemy_item, get_alchemy_activation_message
 
         success, message = craft_alchemy_item(user_id, item_id, self.storage, self.score_manager)
+        user = self.storage.get_user(user_id) or {}
         return {
             "success": success,
             "message": message,
             "activation": get_alchemy_activation_message(item_id) if success else None,
+            "new_balance": user.get("score_balance", 0),
+            "inventory": user.get("inventory", []),
         }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FloatingNav } from '../components/FloatingNav';
 import { botApi } from '../adapters/botAdapter';
@@ -25,6 +25,13 @@ export function BossScreen({ userId = '331113480', bossId }) {
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [taskProgress, setTaskProgress] = useState(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (task && inputRef.current && !processing && feedback?.type !== 'success') {
+      inputRef.current.focus();
+    }
+  }, [task, processing, feedback]);
 
   const loadBoss = useCallback(async () => {
     setLoading(true);
@@ -157,8 +164,10 @@ export function BossScreen({ userId = '331113480', bossId }) {
       <div className="boss-screen__card">
         <p className="boss-screen__question">{task?.question}</p>
         <input
+          ref={inputRef}
           className="boss-screen__input"
           type="text"
+          autoFocus
           inputMode="numeric"
           value={answerInput}
           onChange={(e) => setAnswerInput(e.target.value.replace(/[^0-9.,-]/g, ''))}

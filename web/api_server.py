@@ -345,11 +345,11 @@ def upgrade_artifact(user_id):
 def craft_alchemy(user_id):
     """[POST] Создать зелье/артефакт в Лавке Безумца"""
     try:
-        item_id = (request.get_json(silent=True) or {}).get('item_id')
+        item_id = (request.get_json(force=True, silent=True) or {}).get('item_id')
         if not item_id:
             return jsonify({"success": False, "message": "item_id required"}), 400
 
-        result = engine.craft_alchemy(user_id, item_id)
+        result = engine.craft_alchemy(str(user_id), str(item_id))
         logger.info(f"[ALCHEMY] user={user_id} item={item_id} success={result.get('success')}")
         return jsonify(result)
     except Exception as e:

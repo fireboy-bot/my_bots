@@ -58,6 +58,11 @@ def seeded_user(user_id):
     user["selected_tasks"] = []
     user["current_task_index"] = 0
     user["mistakes_in_level"] = 0
+    user["in_boss_battle"] = False
+    user["current_boss"] = None
+    user["selected_boss_tasks"] = []
+    user["boss_task_index"] = 0
+    user["boss_health"] = 5
     user["consecutive_errors"] = 0
     user["chaos_energy"] = 0
     storage.save_user(uid, user)
