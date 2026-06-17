@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FloatingNav } from '../components/FloatingNav';
+import { CoinsLabel } from '../components/CoinIcon';
 import { botApi } from '../adapters/botAdapter';
 import './BankScreen.css';
 
@@ -211,7 +212,7 @@ export function BankScreen({ userId = "331113480", onBack }) {
           <div className="balance-icon">💰</div>
           <div className="balance-info">
             <span className="balance-label">На руках</span>
-            <span className="balance-value">{formatNumber(balanceOnHand)} 🪙</span>
+            <span className="balance-value"><CoinsLabel amount={balanceOnHand} /></span>
           </div>
         </div>
         
@@ -219,7 +220,7 @@ export function BankScreen({ userId = "331113480", onBack }) {
           <div className="balance-icon">🏦</div>
           <div className="balance-info">
             <span className="balance-label">В банке</span>
-            <span className="balance-value">{formatNumber(bankBalance)} 🪙</span>
+            <span className="balance-value"><CoinsLabel amount={bankBalance} /></span>
           </div>
         </div>
       </div>
@@ -237,11 +238,11 @@ export function BankScreen({ userId = "331113480", onBack }) {
         </div>
         <div className="interest-row">
           <span>Накоплено:</span>
-          <strong className="interest-value">+{formatNumber(interestEarned)} 🪙</strong>
+          <strong className="interest-value">+<CoinsLabel amount={interestEarned} /></strong>
         </div>
         <div className="interest-total">
           <span>Можно забрать:</span>
-          <strong>{formatNumber(totalWithdrawable)} 🪙</strong>
+          <strong><CoinsLabel amount={totalWithdrawable} /></strong>
         </div>
       </div>
 
@@ -258,7 +259,7 @@ export function BankScreen({ userId = "331113480", onBack }) {
               onClick={() => handleDeposit(amount)}
               disabled={processing || balanceOnHand < amount}
             >
-              +{amount.toLocaleString()} 🪙
+              +<CoinsLabel amount={amount} />
             </button>
           ))}
         </div>
@@ -295,7 +296,7 @@ export function BankScreen({ userId = "331113480", onBack }) {
           onClick={handleWithdraw}
           disabled={processing || bankBalance <= 0}
         >
-          {processing ? '⏳ Обработка...' : `💸 Забрать ${formatNumber(totalWithdrawable)} 🪙`}
+          {processing ? '⏳ Обработка...' : <>💸 Забрать <CoinsLabel amount={totalWithdrawable} /></>}
         </button>
         
         {bankBalance <= 0 && (

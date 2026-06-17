@@ -6,6 +6,7 @@ import { ChaosCoreOverlay } from '../components/ChaosCoreOverlay';
 import { ChaosParticles } from '../components/ChaosParticles';
 import { TaskArea } from '../components/TaskArea';
 import { GameEventOverlay } from '../components/GameEventOverlay';
+import { CoinIcon } from '../components/CoinIcon';
 import { botApi } from '../adapters/botAdapter';
 import './TaskScreen.css';
 
@@ -39,7 +40,7 @@ const StatsPanel = memo(function StatsPanel({ playerStats }) {
         </div>
       </div>
       <div className="stat-item">
-        <span className="stat-icon" data-type="coins">🪙</span>
+        <span className="stat-icon" data-type="coins"><CoinIcon size={24} /></span>
         <div>
           <div className="stat-value">{playerStats.coins}</div>
           <div className="stat-label">Монеты</div>

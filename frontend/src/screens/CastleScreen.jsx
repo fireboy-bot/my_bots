@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FloatingNav } from '../components/FloatingNav';
+import { CoinIcon, CoinsLabel } from '../components/CoinIcon';
 import { botApi } from '../adapters/botAdapter';
 import './CastleScreen.css';
 
 // 🔹 Декорации из твоего items.py (синхронизируй с ботом!)
 const CASTLE_DECORATIONS = [
-  { id: "carrot_wall", name: "🥕 Морковки на стене", emoji: "🥕", description: "Уют и мотивация", base_price: 300, cost_multiplier: 1.4, bonus_per_level: 0.02, max_bonus: 0.10 },
-  { id: "candles", name: "🕯️ Серебряные подсвечники", emoji: "🕯️", description: "Атмосфера и свет", base_price: 400, cost_multiplier: 1.5, bonus_per_level: 0.03, max_bonus: 0.15 },
-  { id: "pythagoras", name: "🖼️ Портрет Пифагора", emoji: "🖼️", description: "Мудрость великих", base_price: 500, cost_multiplier: 1.6, bonus_per_level: 0.04, max_bonus: 0.20 },
-  { id: "formula_wallpaper", name: "📐 Обои «Сад формул»", emoji: "📐", description: "Красота математики", base_price: 600, cost_multiplier: 1.7, bonus_per_level: 0.05, max_bonus: 0.25 },
-  { id: "crystal_chandelier", name: "💡 Хрустальная люстра", emoji: "💡", description: "Роскошь и вдохновение", base_price: 800, cost_multiplier: 1.8, bonus_per_level: 0.06, max_bonus: 0.30 },
-  { id: "textbook_throne", name: "🪑 Трон из учебников", emoji: "🪑", description: "Власть знаний", base_price: 1000, cost_multiplier: 2.0, bonus_per_level: 0.08, max_bonus: 0.40 },
-  { id: "star_dome", name: "🌟 Звёздный купол", emoji: "🌟", description: "Бесконечность возможностей", base_price: 1500, cost_multiplier: 2.2, bonus_per_level: 0.10, max_bonus: 0.50 },
-  { id: "vladimir_monocle", name: "🎩 Монокль Владимира", emoji: "🎩", description: "Элегантность дворецкого", base_price: 2000, cost_multiplier: 2.5, bonus_per_level: 0.12, max_bonus: 0.60 },
+  { id: "carrot_wall", name: "🥕 Морковки на стене", emoji: "🥕", description: "Сладкие морковки украшают стены!", base_price: 300, cost_multiplier: 1.4, bonus_per_level: 0.02, max_bonus: 0.10 },
+  { id: "candles", name: "🕯️ Серебряные подсвечники", emoji: "🕯️", description: "Серебряный свет освещает залы!", base_price: 400, cost_multiplier: 1.4, bonus_per_level: 0.02, max_bonus: 0.10 },
+  { id: "portrait_math", name: "🖼️ Портрет Пифагора", emoji: "🖼️", description: "Великий математик вдохновляет тебя!", base_price: 500, cost_multiplier: 1.4, bonus_per_level: 0.02, max_bonus: 0.10 },
+  { id: "formula_wallpaper", name: "📐 Обои «Сад формул»", emoji: "📐", description: "Формулы растут как цветы в саду!", base_price: 1500, cost_multiplier: 1.4, bonus_per_level: 0.02, max_bonus: 0.10 },
+  { id: "chandelier", name: "💡 Хрустальная люстра", emoji: "💡", description: "Хрусталь переливается всеми цветами!", base_price: 2500, cost_multiplier: 1.4, bonus_per_level: 0.02, max_bonus: 0.10 },
+  { id: "textbook_throne", name: "🪑 Трон из учебников", emoji: "🪑", description: "Трон мудрости для настоящего матемага!", base_price: 3000, cost_multiplier: 1.4, bonus_per_level: 0.02, max_bonus: 0.10 },
+  { id: "star_dome", name: "🌟 Звёздный купол", emoji: "🌟", description: "Звёзды светят над твоим замком!", base_price: 7500, cost_multiplier: 1.4, bonus_per_level: 0.02, max_bonus: 0.10 },
+  { id: "vladimir_monocle", name: "🎩 Монокль Владимира", emoji: "🎩", description: "Легендарный монокль дворецкого!", base_price: 20000, cost_multiplier: 1.4, bonus_per_level: 0.02, max_bonus: 0.10 },
 ];
 
 export function CastleScreen({ userId = "331113480", onBack }) {
@@ -128,7 +129,7 @@ export function CastleScreen({ userId = "331113480", onBack }) {
       : Math.floor(decoration.base_price * Math.pow(decoration.cost_multiplier, currentLevel));
     
     if ((playerStats?.score_balance || 0) < price) {
-      setMessage({ type: 'error', text: `❌ Недостаточно золота! Нужно ${price.toLocaleString()} 🪙` });
+      setMessage({ type: 'error', text: `❌ Недостаточно золота! Нужно ${price.toLocaleString()} мон.` });
       setTimeout(() => setMessage(null), 3000);
       return;
     }
@@ -150,7 +151,7 @@ export function CastleScreen({ userId = "331113480", onBack }) {
         setCastleInfo(castle);
         setPlayerStats(profile);
       } else {
-        setMessage({ type: 'error', text: result.message });
+        setMessage({ type: 'error', text: result.message || result.error || 'Не удалось улучшить декорацию' });
       }
     } catch (error) {
       console.error('❌ Error upgrading decoration:', error);
@@ -334,14 +335,14 @@ export function CastleScreen({ userId = "331113480", onBack }) {
       {/* 🔹 БАЛАНС */}
       <div className="balance-card">
         <span>💰 На руках:</span>
-        <strong>{playerStats?.score_balance?.toLocaleString() || 0} 🪙</strong>
+        <strong><CoinsLabel amount={playerStats?.score_balance || 0} /></strong>
       </div>
 
       {/* 🔹 ОПЛАТА UPKEEP */}
       <div className="upkeep-section">
         <h3>⚙️ Оплатить содержание</h3>
         <p className="upkeep-desc">
-          Цена: <strong>{(upkeepDays * 50).toLocaleString()} 🪙</strong> за {upkeepDays} день(ей)
+          Цена: <strong><CoinsLabel amount={upkeepDays * 50} /></strong> за {upkeepDays} день(ей)
         </p>
         
         <div className="days-selector">
@@ -362,7 +363,7 @@ export function CastleScreen({ userId = "331113480", onBack }) {
           onClick={handlePayUpkeep}
           disabled={processing || (playerStats?.score_balance || 0) < upkeepDays * 50}
         >
-          {processing ? '⏳ Обработка...' : `💰 Оплатить ${(upkeepDays * 50).toLocaleString()} 🪙`}
+          {processing ? '⏳ Обработка...' : <>💰 Оплатить <CoinsLabel amount={upkeepDays * 50} /></>}
         </button>
       </div>
 
@@ -394,7 +395,7 @@ export function CastleScreen({ userId = "331113480", onBack }) {
                     <span className="dec-bonus">+{Math.round(bonus * 100)}%</span>
                   </>
                 ) : (
-                  <span className="dec-price">{price.toLocaleString()} 🪙</span>
+                  <span className="dec-price"><CoinsLabel amount={price} /></span>
                 )}
                 
                 {selectedDecoration?.id === dec.id && (

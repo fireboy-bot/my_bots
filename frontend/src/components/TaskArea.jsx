@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { CharacterCard } from './CharacterCard';
+import { CoinIcon } from './CoinIcon';
 
 export function TaskArea({ 
   task, 
@@ -111,7 +112,11 @@ export function TaskArea({
           <div className={`feedback feedback--${feedback.type}`}>
             {feedback.text}
             {feedback.reward !== undefined && feedback.reward !== 0 && (
-              <span> {feedback.reward > 0 ? `+${feedback.reward}` : feedback.reward} 🪙</span>
+              <span className="feedback-reward">
+                {' '}
+                {feedback.reward > 0 ? `+${feedback.reward}` : feedback.reward}
+                <CoinIcon size={14} />
+              </span>
             )}
           </div>
         )}

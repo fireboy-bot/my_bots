@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FloatingNav } from '../components/FloatingNav';
 import { CharacterCard } from '../components/CharacterCard';
+import { CoinsLabel } from '../components/CoinIcon';
 import { botApi } from '../adapters/botAdapter';
 import './ArtifactsScreen.css';
 
@@ -103,7 +104,7 @@ export function ArtifactsScreen({ userId = "331113480", onBack }) {
     
     const price = level === 0 ? artifact.base_price : Math.floor(artifact.base_price * Math.pow(artifact.cost_multiplier, level));
     if ((playerStats?.score_balance || 0) < price) {
-      setMessage({ type: 'error', text: `❌ Недостаточно золота! Нужно ${price.toLocaleString()} 🪙` });
+      setMessage({ type: 'error', text: `❌ Недостаточно золота! Нужно ${price.toLocaleString()} мон.` });
       setTimeout(() => setMessage(null), 3000);
       return;
     }
@@ -206,7 +207,7 @@ export function ArtifactsScreen({ userId = "331113480", onBack }) {
               {!isMaxed ? (
                 <button className={`upgrade-btn ${canAfford && isActive ? '' : 'disabled'}`}
                   onClick={() => handleUpgrade(artifact.id)} disabled={processing || !canAfford || !isActive}>
-                  {level === 0 ? `🛒 Купить за ${price.toLocaleString()} 🪙` : `⬆️ Улучшить за ${price.toLocaleString()} 🪙`}
+                  {level === 0 ? <>🛒 Купить за <CoinsLabel amount={price} /></> : <>⬆️ Улучшить за <CoinsLabel amount={price} /></>}
                 </button>
               ) : (
                 <div className="maxed">⚡ МАКСИМАЛЬНЫЙ УРОВЕНЬ!</div>

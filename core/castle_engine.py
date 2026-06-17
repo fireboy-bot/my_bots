@@ -5,7 +5,6 @@
 """
 
 import logging
-import sqlite3
 import json
 from typing import Dict, Any, Tuple, Optional
 from datetime import datetime, timezone
@@ -30,6 +29,29 @@ def _parse_decoration_upgrades(data):
         except:
             return {}
     return {}
+
+
+def _get_decoration_upgrades_from_user(user: Dict[str, Any]) -> Dict[str, int]:
+    """Читает уровни декораций из castle_data (основное хранилище)."""
+    castle_data = user.get("castle_data") or {}
+    if isinstance(castle_data, str):
+        try:
+            castle_data = json.loads(castle_data)
+        except (json.JSONDecodeError, TypeError):
+            castle_data = {}
+
+    upgrades = _parse_decoration_upgrades(castle_data.get("decoration_upgrades", {}))
+    if upgrades:
+        return upgrades
+
+    # Обратная совместимость со старым полем на корне user
+    return _parse_decoration_upgrades(user.get("decoration_upgrades", {}))
+
+
+def _set_decoration_upgrades_on_user(user: Dict[str, Any], upgrades: Dict[str, int]) -> None:
+    castle_data = dict(user.get("castle_data") or {})
+    castle_data["decoration_upgrades"] = upgrades
+    user["castle_data"] = castle_data
 
 
 class CastleEngine:
@@ -66,7 +88,7 @@ class CastleEngine:
         bonuses_active = upkeep_paid_until > now
         
         # Получаем уровни декораций
-        decoration_upgrades = _parse_decoration_upgrades(user.get("decoration_upgrades", {}))
+        decoration_upgrades = _get_decoration_upgrades_from_user(user)
         
         # Считаем общий бонус
         total_bonus = self._calculate_total_bonus(decoration_upgrades, bonuses_active)
@@ -105,8 +127,7 @@ class CastleEngine:
         if not user:
             return 0
         
-        # ✅ ПАРСИМ JSON СТРОКУ!
-        decoration_upgrades = _parse_decoration_upgrades(user.get("decoration_upgrades", {}))
+        decoration_upgrades = _get_decoration_upgrades_from_user(user)
         return decoration_upgrades.get(decoration_id, 0)
     
     def get_decoration_bonus(self, decoration_id: str, level: int) -> float:
@@ -194,28 +215,16 @@ class CastleEngine:
         
         if not success:
             return (False, message)
-        
-        # ✅ ПРЯМО ОБНОВЛЯЕМ decoration_upgrades В БАЗЕ!
-        conn = sqlite3.connect("data/progress.db")
-        c = conn.cursor()
-        
-        # Получаем текущие уровни
-        c.execute("SELECT decoration_upgrades FROM users WHERE user_id = ?", (str(user_id),))
-        row = c.fetchone()
-        
-        current_upgrades = _parse_decoration_upgrades(row[0] if row else {})
-        
-        # Обновляем уровень
+
+        user = self.storage.get_user(user_id) or user
+        current_upgrades = _get_decoration_upgrades_from_user(user)
+
         new_level = current_level + 1
         current_upgrades[decoration_id] = new_level
-        
-        # Сохраняем в базу
-        c.execute(
-            "UPDATE users SET decoration_upgrades = ? WHERE user_id = ?",
-            (json.dumps(current_upgrades, ensure_ascii=False), str(user_id))
-        )
-        conn.commit()
-        conn.close()
+        _set_decoration_upgrades_on_user(user, current_upgrades)
+
+        if not self.storage.save_user(user_id, user):
+            return (False, "❌ Не удалось сохранить декорацию")
         
         new_bonus = self.get_decoration_bonus(decoration_id, new_level)
         

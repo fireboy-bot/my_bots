@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FloatingNav } from '../components/FloatingNav';
 import { CharacterCard } from '../components/CharacterCard';
+import { CoinsLabel } from '../components/CoinIcon';
 import { botApi } from '../adapters/botAdapter';
 import './AlchemyScreen.css';
 
@@ -81,7 +82,7 @@ export function AlchemyScreen({ userId = "331113480", onBack }) {
     
     const balance = playerStats?.score_balance || 0;
     if (balance < item.cost) {
-      setMessage({ type: 'error', text: `❌ Недостаточно золота! Нужно ${item.cost} 🪙` });
+      setMessage({ type: 'error', text: `❌ Недостаточно золота! Нужно ${item.cost} мон.` });
       setTimeout(() => setMessage(null), 3000);
       return;
     }
@@ -181,7 +182,7 @@ export function AlchemyScreen({ userId = "331113480", onBack }) {
                 </div>
               </div>
               <div className="alchemy-stats">
-                <div><span>Цена:</span> <strong>{item.cost} 🪙</strong></div>
+                <div><span>Цена:</span> <strong><CoinsLabel amount={item.cost} /></strong></div>
                 <div><span>Тип:</span> <strong>{item.type === 'one_time_risk' ? '⚡ Одноразовый' : '🌀 На уровень'}</strong></div>
                 <div><span>Статус:</span> <strong className={isUnlocked ? 'ok' : 'locked'}>
                   {isUnlocked ? (inInventory ? '✅ В инвентаре' : '🔓 Открыт') : '🔒 Закрыт'}
@@ -190,7 +191,7 @@ export function AlchemyScreen({ userId = "331113480", onBack }) {
               {isUnlocked && (
                 <button className={`craft-btn ${canCraft ? '' : 'disabled'}`}
                   onClick={() => handleCraft(item.id)} disabled={processing || !canCraft}>
-                  {inInventory ? '✅ Уже создан' : `⚗️ Создать за ${item.cost} 🪙`}
+                  {inInventory ? '✅ Уже создан' : <>⚗️ Создать за <CoinsLabel amount={item.cost} /></>}
                 </button>
               )}
             </div>
