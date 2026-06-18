@@ -42,7 +42,14 @@ if (Test-Path "$Root\.env") {
 }
 
 Write-Host "=== 4. Remote setup ===" -ForegroundColor Cyan
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 ssh $Remote "sed -i 's/\r$//' /tmp/chislyandia-setup.sh; bash /tmp/chislyandia-setup.sh"
+$sshExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+if ($sshExit -ne 0) {
+    throw "Remote setup failed with exit code $sshExit"
+}
 
 Write-Host ""
 Write-Host "=== Staging ready ===" -ForegroundColor Green
