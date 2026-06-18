@@ -185,9 +185,7 @@ export function CastleScreen({ userId = "331113480", onBack }) {
   };
 
   const handleSecretRoom = () => {
-    // 🔹 Заглушка — в реальном боте: переход к secret_room.py
-    setMessage({ type: 'system', text: "🗝️ <i>«Тайная комната... пока закрыта. Но вы на правильном пути.»</i>" });
-    setTimeout(() => setMessage(null), 4000);
+    navigate(`/game/secret-room/${userId}`);
   };
 
   // 🔹 Хелпер: цена следующего уровня декорации

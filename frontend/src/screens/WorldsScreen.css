@@ -46,6 +46,45 @@
   text-align: center;
 }
 
+.worlds-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.worlds-section__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.worlds-section__hint {
+  margin: 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.worlds-section--postgame {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px dashed rgba(129, 140, 248, 0.35);
+}
+
+.worlds-bosses__subtitle {
+  margin: 16px 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #c4b5fd;
+}
+
+.boss-card--endgame {
+  margin-top: 12px;
+  border-color: rgba(251, 191, 36, 0.45);
+  background: linear-gradient(135deg, rgba(120, 53, 15, 0.35), rgba(15, 23, 42, 0.6));
+}
+
 .worlds-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

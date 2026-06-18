@@ -48,6 +48,36 @@
   background: linear-gradient(160deg, #78350f, #4c1d95, #1e3a5f);
 }
 
+.game-event-card--absolute {
+  background: linear-gradient(160deg, #1e1b4b, #581c87, #7f1d1d);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.game-event-card__finale {
+  font-style: italic;
+  opacity: 0.9;
+  font-size: 14px;
+  white-space: pre-line;
+}
+
+.game-event-card__secret {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  text-align: left;
+  font-size: 13px;
+  white-space: pre-line;
+}
+
+.game-event-card__secret-title {
+  font-weight: 800;
+  color: #fde68a;
+  margin-top: 0 !important;
+}
+
 .game-event-card__actions {
   display: flex;
   flex-direction: column;

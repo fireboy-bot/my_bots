@@ -41,8 +41,8 @@ export function FloatingNav({
   const handleSettings = () => {
     if (onSettings) {
       onSettings();
-    } else {
-      console.log('⚙️ Settings clicked');
+    } else if (userId) {
+      navigate(`/game/profile/${userId}`);
     }
   };
 
@@ -74,10 +74,10 @@ export function FloatingNav({
         <button 
           className="nav-btn nav-btn--settings" 
           onClick={handleSettings}
-          title="Настройки"
-          aria-label="Настройки"
+          title="Профиль"
+          aria-label="Профиль"
         >
-          ⚙️
+          👤
         </button>
       )}
     </div>

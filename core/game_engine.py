@@ -263,7 +263,7 @@ class ChislyandiaEngine:
                 user = self.storage.get_user(user_id) or user
                 chaos_state = self._apply_chaos_tick(user, result.get("correct", is_correct))
                 self.storage.save_user(user_id, user)
-                result["level_up"] = False
+                result["level_up"] = bool(result.get("player_level_up") or result.get("level_up"))
                 result["chaos_state"] = chaos_state
                 result["transfer_task"] = None
                 return result
@@ -648,6 +648,11 @@ class ChislyandiaEngine:
 
         return exit_boss_run(self.storage, user_id)
 
+    def process_true_lord_hint(self, user_id: str) -> Dict[str, Any]:
+        from core.true_lord_run import process_true_lord_hint
+
+        return process_true_lord_hint(self.storage, self.score_manager, user_id)
+
     def get_random_task(self, user_id: str, world: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Выдать случайную задачу — единый источник data/worlds/ (как TG)."""
         from core.task_loader import pick_task_for_user
@@ -691,29 +696,13 @@ class ChislyandiaEngine:
     
     def get_player_profile(self, user_id: str) -> Dict[str, Any]:
         """Получает профиль игрока"""
+        from core.player_profile_view import build_profile_summary
+
         user = self.storage.get_user(user_id)
         if not user:
             return {"error": "Игрок не найден"}
-        
-        return {
-            "user_id": user_id,
-            "level": user.get("level", 1),
-            "xp": user.get("xp", 0),
-            "total_score": user.get("total_score", 0),
-            "score_balance": user.get("score_balance", 0),
-            "tasks_solved": user.get("tasks_solved", 0),
-            "tasks_correct": user.get("tasks_correct", 0),
-            "inventory": user.get("inventory", []),
-            "artifact_upgrades": user.get("artifact_upgrades", {}),
-            "defeated_bosses": user.get("defeated_bosses", []),
-            "unlocked_zones": user.get("unlocked_zones", ["addition"]),
-            "completed_normal_game": user.get("completed_normal_game", False),
-            # 🔹 Chaos System поля для витрины
-            "chaos_energy": user.get("chaos_energy", 0),
-            "rift_stage": user.get("rift_stage", 0),
-            "artifact_chaos_state": user.get("artifact_chaos_state", "dormant"),
-            "consecutive_errors": user.get("consecutive_errors", 0)
-        }
+
+        return build_profile_summary(user, str(user_id))
     
     def get_artifact_info(self, user_id: str) -> Dict[str, Any]:
         """Получает информацию об артефактах игрока"""

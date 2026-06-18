@@ -173,6 +173,22 @@ def exit_boss():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/game/true-lord/hint', methods=['POST'])
+def true_lord_hint():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify({"error": "user_id required"}), 400
+        result = engine.process_true_lord_hint(str(user_id))
+        if result.get("error"):
+            return jsonify(result), 400
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[ERROR] true_lord_hint: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # 🔹 ЗАДАЧА — без изменений
 @app.route('/api/game/task')
 def get_task():
@@ -367,6 +383,58 @@ def craft_alchemy(user_id):
         return jsonify(result)
     except Exception as e:
         logger.error(f"[ERROR] craft_alchemy: {e}", exc_info=True)
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route('/api/inventory/<user_id>')
+def get_inventory(user_id):
+    try:
+        from core.inventory_view import build_inventory_view
+
+        user = storage.get_user(user_id)
+        if not user:
+            return jsonify({"error": "Игрок не найден"})
+        return jsonify(build_inventory_view(user))
+    except Exception as e:
+        logger.error(f"[ERROR] get_inventory: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# 🔹 ТАЙНАЯ КОМНАТА
+@app.route('/api/secret_room/<user_id>')
+def get_secret_room(user_id):
+    try:
+        from core.secret_room_engine import get_secret_room_state
+        return jsonify(get_secret_room_state(storage, user_id))
+    except Exception as e:
+        logger.error(f"[ERROR] get_secret_room: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/secret_room/<user_id>/explore', methods=['POST'])
+def explore_secret_room(user_id):
+    try:
+        from core.secret_room_engine import explore_secret_room as explore_fn
+        return jsonify(explore_fn(storage, score_manager, user_id))
+    except Exception as e:
+        logger.error(f"[ERROR] explore_secret_room: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route('/api/secret_room/<user_id>/answer', methods=['POST'])
+def answer_secret_room(user_id):
+    try:
+        from core.secret_room_engine import answer_secret_puzzle
+        body = request.get_json(silent=True) or {}
+        puzzle_id = body.get("puzzle_id")
+        option_index = body.get("option_index")
+        if puzzle_id is None or option_index is None:
+            return jsonify({"success": False, "message": "puzzle_id and option_index required"}), 400
+        return jsonify(
+            answer_secret_puzzle(storage, score_manager, user_id, str(puzzle_id), int(option_index))
+        )
+    except Exception as e:
+        logger.error(f"[ERROR] answer_secret_room: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
 

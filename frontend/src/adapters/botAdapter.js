@@ -151,6 +151,13 @@ export const botApi = {
     });
   },
 
+  async trueLordHint(userId) {
+    return await apiFetch('/api/game/true-lord/hint', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    });
+  },
+
   // 🔹 Банк
   async getBankInfo(userId) {
     try {
@@ -247,6 +254,38 @@ export const botApi = {
     return await apiFetch(`/api/alchemy/${encodeURIComponent(userId)}/craft`, {
       method: 'POST',
       body: JSON.stringify({ item_id: itemId }),
+    });
+  },
+
+  async getInventory(userId) {
+    try {
+      return await apiFetch(`/api/inventory/${encodeURIComponent(userId)}`);
+    } catch (error) {
+      console.warn('⚠️ Using mock inventory');
+      return { consumables: [], trophies: [], artifacts: [], secret_items: [], total_count: 0, is_empty: true };
+    }
+  },
+
+  async getSecretRoom(userId) {
+    try {
+      return await apiFetch(`/api/secret_room/${encodeURIComponent(userId)}`);
+    } catch (error) {
+      console.warn('⚠️ Using mock secret room');
+      return { unlocked: false, available: false, attempts_left: 0 };
+    }
+  },
+
+  async exploreSecretRoom(userId) {
+    return await apiFetch(`/api/secret_room/${encodeURIComponent(userId)}/explore`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  async answerSecretPuzzle(userId, puzzleId, optionIndex) {
+    return await apiFetch(`/api/secret_room/${encodeURIComponent(userId)}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({ puzzle_id: puzzleId, option_index: optionIndex }),
     });
   },
 };

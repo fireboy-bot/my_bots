@@ -30,6 +30,40 @@ def test_profile_alias_progress(client, seeded_user, user_id):
         assert data["user_id"] == user_id
         assert data["score_balance"] == 500
         assert "unlocked_zones" in data
+        assert "rank_title" in data
+        assert "accuracy" in data
+        assert "islands_completed" in data
+
+
+def test_postgame_bosses_after_final_boss(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["defeated_bosses"] = ["final_boss"]
+    user["unlocked_zones"] = list(set(user.get("unlocked_zones") or []) | {"time_world", "measure_world", "logic_world", "true_lord"})
+    user["completed_zones"] = ["time_world"]
+    storage.save_user(user_id, user)
+
+    r = client.get(f"/api/game/bosses/{user_id}")
+    bosses = {b["id"]: b for b in r.get_json().get("bosses", [])}
+    assert "time_keeper" in bosses
+    assert bosses["time_keeper"]["unlocked"] is True
+    assert bosses["measure_keeper"]["unlocked"] is False
+    assert bosses["true_lord"]["unlocked"] is False
+
+
+def test_keeper_locked_without_world_complete(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["defeated_bosses"] = ["final_boss"]
+    user["unlocked_zones"] = list(set(user.get("unlocked_zones") or []) | {"time_world", "measure_world", "logic_world"})
+    user["completed_zones"] = []
+    storage.save_user(user_id, user)
+
+    r = client.post(
+        "/api/game/boss/start",
+        data=json.dumps({"user_id": user_id, "boss_id": "time_keeper"}),
+        content_type="application/json",
+    )
+    assert r.status_code == 403
+    assert "Времени" in r.get_json().get("error", "")
 
 
 def test_get_worlds(client, seeded_user, user_id):
@@ -50,7 +84,7 @@ def test_get_bosses(client, seeded_user, user_id):
     assert r.status_code == 200
     data = r.get_json()
     bosses = data.get("bosses", [])
-    assert len(bosses) >= 5
+    assert len(bosses) >= 9
     final = next(b for b in bosses if b["id"] == "final_boss")
     assert final["tier"] == "final"
     assert final["unlocked"] is False
@@ -414,6 +448,54 @@ def test_artifacts_list(client, seeded_user, user_id):
     assert isinstance(r.get_json(), dict)
 
 
+def test_inventory_api(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["inventory"] = ["bravery_potion", "bravery_potion", "sum_gloves"]
+    user["rewards"] = ["звезда_сложения"]
+    user["artifact_upgrades"] = {"artifact_luck": 2}
+    storage.save_user(user_id, user)
+
+    r = client.get(f"/api/inventory/{user_id}")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["total_count"] >= 4
+    assert len(data["consumables"]) == 2
+    assert any(c["id"] == "bravery_potion" and c["count"] == 2 for c in data["consumables"])
+    assert len(data["trophies"]) == 1
+    assert len(data["artifacts"]) == 1
+    assert data["artifacts"][0]["level"] == 2
+
+
+def test_secret_room_locked_without_castle(client, seeded_user, user_id):
+    r = client.get(f"/api/secret_room/{user_id}")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("unlocked") is False
+
+
+def test_secret_room_explore_when_unlocked(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["defeated_bosses"] = ["final_boss"]
+    user["completed_normal_game"] = True
+    storage.save_user(user_id, user)
+
+    r = client.get(f"/api/secret_room/{user_id}")
+    data = r.get_json()
+    assert data.get("unlocked") is True
+    assert data.get("attempts_left") == 3
+
+    explore = client.post(
+        f"/api/secret_room/{user_id}/explore",
+        data=json.dumps({}),
+        content_type="application/json",
+    )
+    assert explore.status_code == 200
+    body = explore.get_json()
+    assert body.get("success") is True
+    assert body.get("event_type") in {"puzzle", "reward", "lore", "empty"}
+    assert body.get("state", {}).get("attempts_left") == 2
+
+
 def test_alchemy_locked_recipe(client, seeded_user, user_id):
     r = client.post(
         f"/api/alchemy/{user_id}/craft",
@@ -445,3 +527,56 @@ def test_alchemy_craft_success(client, user_id):
     assert data["success"] is True
     assert "bravery_potion" in storage.get_user(uid).get("inventory", [])
     assert data.get("new_balance") == 350
+
+
+def test_true_lord_epic_start(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["defeated_bosses"] = ["time_keeper", "measure_keeper", "logic_keeper"]
+    user["unlocked_zones"] = list(
+        set(user.get("unlocked_zones") or [])
+        | {"time_world", "measure_world", "logic_world", "true_lord"}
+    )
+    storage.save_user(user_id, user)
+
+    r = client.post(
+        "/api/game/boss/start",
+        data=json.dumps({"user_id": user_id, "boss_id": "true_lord"}),
+        content_type="application/json",
+    )
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("epic") is True
+    assert data.get("boss_max_health") == 20
+    assert data.get("phase") == "calm"
+    assert data.get("avatar_url") == "/images/true_lord_calm.jpg"
+    assert data.get("task")
+    assert len(data.get("dialogues", [])) >= 3
+
+
+def test_true_lord_hint(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["defeated_bosses"] = ["time_keeper", "measure_keeper", "logic_keeper"]
+    user["unlocked_zones"] = list(
+        set(user.get("unlocked_zones") or [])
+        | {"time_world", "measure_world", "logic_world", "true_lord"}
+    )
+    storage.save_user(user_id, user)
+
+    client.post(
+        "/api/game/boss/start",
+        data=json.dumps({"user_id": user_id, "boss_id": "true_lord"}),
+        content_type="application/json",
+    )
+
+    balance_before = storage.get_user(user_id)["score_balance"]
+    r = client.post(
+        "/api/game/true-lord/hint",
+        data=json.dumps({"user_id": user_id}),
+        content_type="application/json",
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body.get("success") is True
+    assert body.get("hint")
+    assert storage.get_user(user_id)["score_balance"] == balance_before - 10
+    assert storage.get_user(user_id).get("true_lord_used_hint") is True

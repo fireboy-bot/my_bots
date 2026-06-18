@@ -1,0 +1,274 @@
+.true-lord-screen {
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 20px 16px 100px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: #e2e8f0;
+}
+
+.true-lord-screen--loading {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.true-lord-header {
+  text-align: center;
+}
+
+.true-lord-avatar {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 3px solid rgba(251, 191, 36, 0.6);
+  box-shadow: 0 0 24px rgba(168, 85, 247, 0.5);
+  margin-bottom: 10px;
+}
+
+.true-lord-header h1 {
+  margin: 0;
+  font-size: 22px;
+  background: linear-gradient(135deg, #fbbf24, #a855f7, #ef4444);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.true-lord-phase {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.true-lord-phase--calm {
+  background: rgba(99, 102, 241, 0.25);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.true-lord-phase--angry {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+.true-lord-phase--desperate {
+  background: rgba(168, 85, 247, 0.25);
+  color: #d8b4fe;
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  animation: true-lord-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes true-lord-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+.true-lord-hp__label {
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: #fbbf24;
+}
+
+.true-lord-hp__track {
+  height: 10px;
+  background: rgba(15, 23, 42, 0.8);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.true-lord-hp__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ef4444, #f97316);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.true-lord-dialogues {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 2px;
+}
+
+.true-lord-dialogue {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.true-lord-dialogue p {
+  margin: 4px 0 0;
+}
+
+.true-lord-dialogue__speaker {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.85;
+}
+
+.true-lord-dialogue--true_lord {
+  background: rgba(30, 27, 75, 0.85);
+  border-left: 3px solid #a855f7;
+}
+
+.true-lord-dialogue--true_lord.true-lord-dialogue--title {
+  text-align: center;
+  border-left: none;
+  border: 2px solid rgba(251, 191, 36, 0.4);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.true-lord-dialogue--manunya {
+  background: rgba(120, 53, 15, 0.35);
+  border-left: 3px solid #fbbf24;
+}
+
+.true-lord-dialogue--georgy {
+  background: rgba(20, 83, 45, 0.35);
+  border-left: 3px solid #4ade80;
+}
+
+.true-lord-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 2px solid rgba(168, 85, 247, 0.35);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.true-lord-question {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.true-lord-hint {
+  margin: 0;
+  padding: 10px;
+  background: rgba(251, 191, 36, 0.12);
+  border-radius: 10px;
+  font-size: 13px;
+  color: #fde68a;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.true-lord-input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 18px;
+  border-radius: 12px;
+  border: 2px solid rgba(168, 85, 247, 0.4);
+  background: rgba(30, 27, 75, 0.6);
+  color: #f8fafc;
+  text-align: center;
+}
+
+.true-lord-input:focus {
+  outline: none;
+  border-color: #a855f7;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+}
+
+.true-lord-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 10px;
+}
+
+.true-lord-btn {
+  padding: 12px 10px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.true-lord-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.true-lord-btn--hint {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fde68a;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.true-lord-btn--attack {
+  background: linear-gradient(135deg, #7c3aed, #dc2626);
+  color: #fff;
+}
+
+.true-lord-btn--ghost {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  margin-top: 16px;
+}
+
+.true-lord-btn:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.true-lord-feedback {
+  text-align: center;
+  padding: 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.true-lord-feedback--success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+
+.true-lord-feedback--error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.true-lord-feedback--hint {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fde68a;
+}
+
+.true-lord-exit {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: center;
+  padding: 8px;
+}
+
+.true-lord-error {
+  color: #fca5a5;
+  margin-bottom: 8px;
+}

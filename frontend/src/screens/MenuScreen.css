@@ -61,6 +61,63 @@
   margin: 0;
 }
 
+.menu-profile-teaser {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.45);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.menu-profile-teaser:hover {
+  transform: translateY(-2px);
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.menu-profile-teaser__avatar {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.menu-profile-teaser__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-profile-teaser__name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.menu-profile-teaser__meta {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #fbbf24;
+}
+
+.menu-profile-teaser__stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.menu-profile-teaser__cta {
+  font-size: 13px;
+  color: #a5b4fc;
+  white-space: nowrap;
+}
+
 /* 🔹 ПРОФИЛЬ ИГРОКА */
 .menu-screen__profile {
   margin-bottom: 30px;

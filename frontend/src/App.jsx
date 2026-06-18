@@ -8,6 +8,10 @@ import { BankScreen } from './screens/BankScreen';
 import { ShopScreen } from './screens/ShopScreen';
 import { ArtifactsScreen } from './screens/ArtifactsScreen';
 import { AlchemyScreen } from './screens/AlchemyScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
+import { SecretRoomScreen } from './screens/SecretRoomScreen';
+import { InventoryScreen } from './screens/InventoryScreen';
+import { TrueLordScreen } from './screens/TrueLordScreen';
 
 const DEFAULT_USER_ID = import.meta.env.VITE_DEFAULT_USER_ID || '331113480';
 
@@ -26,7 +30,11 @@ function WorldsRoute() {
 
 function BossRoute() {
   const { bossId } = useParams();
-  return <BossScreen userId={useRouteUserId()} bossId={bossId} />;
+  const userId = useRouteUserId();
+  if (bossId === 'true_lord') {
+    return <TrueLordScreen userId={userId} />;
+  }
+  return <BossScreen userId={userId} bossId={bossId} />;
 }
 
 function TaskRoute() {
@@ -59,6 +67,18 @@ function AlchemyRoute() {
   return <AlchemyScreen userId={useRouteUserId()} />;
 }
 
+function ProfileRoute() {
+  return <ProfileScreen userId={useRouteUserId()} />;
+}
+
+function SecretRoomRoute() {
+  return <SecretRoomScreen userId={useRouteUserId()} />;
+}
+
+function InventoryRoute() {
+  return <InventoryScreen userId={useRouteUserId()} />;
+}
+
 function App() {
   return (
     <Routes>
@@ -73,6 +93,9 @@ function App() {
       <Route path="/game/shop/:userId" element={<ShopRoute />} />
       <Route path="/game/shop/artifacts/:userId" element={<ArtifactsRoute />} />
       <Route path="/game/shop/alchemy/:userId" element={<AlchemyRoute />} />
+      <Route path="/game/profile/:userId" element={<ProfileRoute />} />
+      <Route path="/game/secret-room/:userId" element={<SecretRoomRoute />} />
+      <Route path="/game/inventory/:userId" element={<InventoryRoute />} />
     </Routes>
   );
 }

@@ -219,13 +219,14 @@ def complete_island_level(storage, score_manager, user_id: str, user: Dict[str, 
     storage.save_user(user_id, user)
 
     zone_name = ZONE_NAMES_RU.get(world_id, world_id)
+    place_word = "Мир" if world_id in ("time_world", "measure_world", "logic_world") else "Остров"
     next_name = ZONE_NAMES_RU.get(unlocked_zone, unlocked_zone) if unlocked_zone else None
     if unlocked_zone:
-        message = f"🏆 Остров «{zone_name}» пройден! 🔓 Открыт: {next_name}"
+        message = f"🏆 {place_word} «{zone_name}» пройден! 🔓 Открыт: {next_name}"
     elif boss_pending:
-        message = f"🏆 Остров «{zone_name}» пройден! ⚔️ Время бить босса: {boss_pending['name']}"
+        message = f"🏆 {place_word} «{zone_name}» пройден! ⚔️ Время бить босса: {boss_pending['name']}"
     else:
-        message = f"🏆 Остров «{zone_name}» пройден!"
+        message = f"🏆 {place_word} «{zone_name}» пройден!"
 
     return {
         "island_complete": True,

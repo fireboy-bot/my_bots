@@ -118,6 +118,33 @@ export function GameEventOverlay({ event, onContinue }) {
     );
   }
 
+  if (event.type === 'absolute_victory') {
+    return (
+      <div className="game-event-overlay" role="dialog" aria-modal="true" aria-live="polite">
+        <div className="game-event-card game-event-card--absolute">
+          <div className="game-event-card__icon">🌟</div>
+          <h2>Абсолютная победа!</h2>
+          <p>{event.message}</p>
+          {event.finaleText && (
+            <p className="game-event-card__finale">{event.finaleText}</p>
+          )}
+          {event.secretText && (
+            <div className="game-event-card__secret">
+              <p className="game-event-card__secret-title">🔒 Секретная реплика</p>
+              <p>{event.secretText}</p>
+            </div>
+          )}
+          {event.rewardItem && (
+            <p className="game-event-card__reward">Награда: {event.rewardItem.replace(/_/g, ' ')}</p>
+          )}
+          <button type="button" className="game-event-card__btn" onClick={onContinue}>
+            Продолжить приключения
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return null;
   })();
 

@@ -54,6 +54,13 @@ def seeded_user(user_id):
     user["score_balance"] = 500
     user["total_score"] = 500
     user["unlocked_zones"] = ["addition"]
+    user["defeated_bosses"] = []
+    user["completed_zones"] = []
+    user["completed_normal_game"] = False
+    user["artifact_upgrades"] = {}
+    user["bank_data"] = {}
+    user["castle_data"] = {"decorations": [], "upkeep_paid_until": None, "decoration_upgrades": {}}
+    user["inventory"] = []
     user["current_level"] = None
     user["selected_tasks"] = []
     user["current_task_index"] = 0

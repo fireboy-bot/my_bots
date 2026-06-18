@@ -13,6 +13,13 @@ from core.level_run import BOSS_MAP, BOSS_NAMES
 ISLAND_BOSS_MAP = BOSS_MAP
 
 FINAL_BOSS_ID = "final_boss"
+TRUE_LORD_ID = "true_lord"
+
+KEEPER_BOSSES = [
+    {"id": "time_keeper", "emoji": "⏳", "name": "Хранитель Времени", "tier": "keeper", "required_zone": "time_world"},
+    {"id": "measure_keeper", "emoji": "📏", "name": "Хранитель Мер", "tier": "keeper", "required_zone": "measure_world"},
+    {"id": "logic_keeper", "emoji": "🧠", "name": "Хранитель Логики", "tier": "keeper", "required_zone": "logic_world"},
+]
 
 BOSS_CATALOG = [
     {"id": "null_void", "emoji": "🌑", "name": "Нуль-Пустота", "tier": "island", "required_zone": "addition"},
@@ -20,6 +27,8 @@ BOSS_CATALOG = [
     {"id": "evil_multiplier", "emoji": "🌀", "name": "Злой Умножитель", "tier": "island", "required_zone": "multiplication"},
     {"id": "fracosaur", "emoji": "🌊", "name": "Дробозавр", "tier": "island", "required_zone": "division"},
     {"id": FINAL_BOSS_ID, "emoji": "👑", "name": "Владыка Числяндии", "tier": "final", "required_zones": ["subtraction", "multiplication", "division"]},
+    *KEEPER_BOSSES,
+    {"id": TRUE_LORD_ID, "emoji": "👁️", "name": "Истинный Владыка", "tier": "endgame"},
 ]
 
 REWARD_MAP = {
@@ -28,6 +37,10 @@ REWARD_MAP = {
     "evil_multiplier": "мантия_умножения",
     "fracosaur": "щит_деления",
     "final_boss": "корона_матемага",
+    "time_keeper": "песочные_часы",
+    "measure_keeper": "линейка_вечности",
+    "logic_keeper": "ключ_логики",
+    "true_lord": "душа_числяндии",
 }
 
 _BOSS_INFO: Optional[Dict[str, Any]] = None
@@ -54,8 +67,6 @@ def _get_modifiers(user_id: str, storage) -> Dict[str, Any]:
 
 
 def load_boss_tasks(boss_id: str) -> Optional[List[Dict[str, Any]]]:
-    if boss_id == "true_lord":
-        return None
     boss_file = os.path.join(BOSS_DATA_DIR, f"{boss_id}.json")
     try:
         with open(boss_file, "r", encoding="utf-8") as f:
@@ -81,9 +92,11 @@ def unlock_new_zones(progress: Dict[str, Any], boss_id: str) -> Dict[str, Any]:
         unlocked.add("division")
     elif boss_id == "fracosaur":
         unlocked.add("secret_level")
-    elif boss_id == "final_boss":
-        unlocked.update({"time_world", "measure_world", "logic_world", "true_lord"})
+    elif boss_id == FINAL_BOSS_ID:
+        unlocked.update({"time_world", "measure_world", "logic_world", TRUE_LORD_ID})
         progress["completed_normal_game"] = True
+    elif boss_id == TRUE_LORD_ID:
+        progress["absolute_victory"] = True
 
     progress["unlocked_zones"] = list(unlocked)
 
@@ -182,6 +195,11 @@ def get_boss_state(user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if not boss_id:
         return None
 
+    if boss_id == TRUE_LORD_ID and user.get("true_lord_epic"):
+        from core.true_lord_run import get_true_lord_state
+
+        return get_true_lord_state(user)
+
     tasks = user.get("selected_boss_tasks") or []
     idx = int(user.get("boss_task_index", 0))
     info = _load_boss_info().get(boss_id, {})
@@ -229,6 +247,38 @@ def can_start_boss(user: Dict[str, Any], boss_id: str) -> tuple[bool, str]:
         if not required.issubset(unlocked):
             return False, "Победи боссов островов: Вычитание, Умножение и Деление!"
 
+    completed = set(user.get("completed_zones") or [])
+    defeated = set(user.get("defeated_bosses") or [])
+
+    if boss_id == "time_keeper":
+        if FINAL_BOSS_ID not in defeated and not user.get("completed_normal_game"):
+            return False, "Сначала победи Финального Владыку!"
+        if "time_world" not in unlocked:
+            return False, "Мир Времени ещё закрыт"
+        if "time_world" not in completed:
+            return False, "Сначала пройди Мир Времени (20 задач)!"
+
+    if boss_id == "measure_keeper":
+        if FINAL_BOSS_ID not in defeated and not user.get("completed_normal_game"):
+            return False, "Сначала победи Финального Владыку!"
+        if "measure_world" not in unlocked:
+            return False, "Мир Мер ещё закрыт"
+        if "measure_world" not in completed:
+            return False, "Сначала пройди Мир Мер (20 задач)!"
+
+    if boss_id == "logic_keeper":
+        if FINAL_BOSS_ID not in defeated and not user.get("completed_normal_game"):
+            return False, "Сначала победи Финального Владыку!"
+        if "logic_world" not in unlocked:
+            return False, "Мир Логики ещё закрыт"
+        if "logic_world" not in completed:
+            return False, "Сначала пройди Мир Логики (20 задач)!"
+
+    if boss_id == TRUE_LORD_ID:
+        keepers = {"time_keeper", "measure_keeper", "logic_keeper"}
+        if not keepers.issubset(defeated):
+            return False, "Победи всех Хранителей: Время, Меры и Логику!"
+
     return True, ""
 
 
@@ -273,6 +323,11 @@ def start_boss_run(storage, user_id: str, boss_id: Optional[str] = None) -> Dict
     boss_id = resolve_boss_id(user, boss_id)
     if not boss_id:
         return {"error": "Босс не указан"}
+
+    if boss_id == TRUE_LORD_ID:
+        from core.true_lord_run import start_true_lord_run
+
+        return start_true_lord_run(storage, user_id)
 
     defeated = set(user.get("defeated_bosses") or [])
     if boss_id in defeated:
@@ -326,6 +381,11 @@ def exit_boss_run(storage, user_id: str) -> Dict[str, Any]:
     if not user or not user.get("in_boss_battle"):
         return {"success": True, "message": "Бой не активен"}
 
+    if user.get("current_boss") == TRUE_LORD_ID and user.get("true_lord_epic"):
+        from core.true_lord_run import exit_true_lord_run
+
+        return exit_true_lord_run(storage, user_id)
+
     boss_id = user.get("current_boss")
     max_hp = get_boss_max_health(boss_id or "")
     user.update(
@@ -350,6 +410,11 @@ def process_boss_answer(storage, score_manager, user_id: str, answer: str) -> Di
     boss_id = user.get("current_boss")
     if not boss_id:
         return {"error": "Босс не найден"}
+
+    if boss_id == TRUE_LORD_ID and user.get("true_lord_epic"):
+        from core.true_lord_run import process_true_lord_answer
+
+        return process_true_lord_answer(storage, score_manager, user_id, answer)
 
     tasks = user.get("selected_boss_tasks") or []
     task_idx = int(user.get("boss_task_index", 0))
@@ -506,6 +571,12 @@ def _finalize_boss_victory(storage, user_id: str, user: Dict[str, Any], boss_id:
         result["completed_normal_game"] = True
         result["message"] = (
             f"🎉 ПОБЕДА над {name}! Замок и артефакты открыты! "
+            f"Награда: {reward_item.replace('_', ' ')}"
+        )
+    if boss_id == TRUE_LORD_ID:
+        result["absolute_victory"] = True
+        result["message"] = (
+            f"🎉 ПОБЕДА над {name}! Ты прошла весь путь Числяндии! "
             f"Награда: {reward_item.replace('_', ' ')}"
         )
     return result

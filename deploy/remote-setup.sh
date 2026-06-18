@@ -20,6 +20,7 @@ fi
 cd "$REMOTE_DIR"
 "$REMOTE_DIR/venv/bin/python" -c "from database.schema import init_database; init_database('data/progress.db')"
 PYTHONPATH="$REMOTE_DIR" "$REMOTE_DIR/venv/bin/python" "$REMOTE_DIR/scripts/seed-staging-user.py" || true
+PYTHONPATH="$REMOTE_DIR" "$REMOTE_DIR/venv/bin/python" "$REMOTE_DIR/scripts/configure-demo-user.py" || true
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
