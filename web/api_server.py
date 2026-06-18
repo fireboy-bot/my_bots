@@ -24,6 +24,7 @@ sys.path.insert(0, BASE_DIR)
 from database.storage import PlayerStorage
 from core.score_manager import ScoreManager
 from core.game_engine import ChislyandiaEngine
+from web.response_helpers import boss_start_result, boss_state_result, engine_json, engine_result
 
 # 🔹 Настройка логирования
 LOGS_DIR = os.path.join(BASE_DIR, 'logs')
@@ -90,8 +91,8 @@ def get_worlds(user_id):
     try:
         result = engine.get_worlds(user_id)
         if result.get("error"):
-            return jsonify(result), 404
-        return jsonify(result)
+            return engine_result(result)
+        return engine_json({**result, "ok": True})
     except Exception as e:
         logger.error(f"[ERROR] get_worlds: {e}")
         return jsonify({"error": str(e)}), 500
@@ -103,8 +104,8 @@ def get_bosses(user_id):
     try:
         result = engine.get_bosses(user_id)
         if result.get("error"):
-            return jsonify(result), 404
-        return jsonify(result)
+            return engine_result(result)
+        return engine_json({**result, "ok": True})
     except Exception as e:
         logger.error(f"[ERROR] get_bosses: {e}")
         return jsonify({"error": str(e)}), 500
@@ -123,9 +124,8 @@ def start_level():
 
         result = engine.start_level_run(str(user_id), str(world))
         if result.get("error"):
-            status = 404 if result["error"] == "Игрок не найден" else 403
-            return jsonify(result), status
-        return jsonify(result)
+            return engine_result(result)
+        return engine_json({**result, "ok": True})
     except Exception as e:
         logger.error(f"[ERROR] start_level: {e}")
         return jsonify({"error": str(e)}), 500
@@ -142,10 +142,7 @@ def start_boss():
             return jsonify({"error": "user_id required"}), 400
 
         result = engine.start_boss_run(str(user_id), str(boss_id) if boss_id else None)
-        if result.get("error"):
-            status = 404 if result["error"] == "Игрок не найден" else 403
-            return jsonify(result), status
-        return jsonify(result)
+        return boss_start_result(result)
     except Exception as e:
         logger.error(f"[ERROR] start_boss: {e}")
         return jsonify({"error": str(e)}), 500
@@ -154,7 +151,7 @@ def start_boss():
 @app.route('/api/game/boss/state/<user_id>')
 def boss_state(user_id):
     try:
-        return jsonify(engine.get_boss_state(user_id))
+        return boss_state_result(engine.get_boss_state(user_id))
     except Exception as e:
         logger.error(f"[ERROR] boss_state: {e}")
         return jsonify({"error": str(e)}), 500
@@ -182,8 +179,8 @@ def true_lord_hint():
             return jsonify({"error": "user_id required"}), 400
         result = engine.process_true_lord_hint(str(user_id))
         if result.get("error"):
-            return jsonify(result), 400
-        return jsonify(result)
+            return engine_json({**result, "ok": False}, 400)
+        return engine_json({**result, "ok": True})
     except Exception as e:
         logger.error(f"[ERROR] true_lord_hint: {e}")
         return jsonify({"error": str(e)}), 500

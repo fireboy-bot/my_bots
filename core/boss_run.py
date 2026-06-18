@@ -8,6 +8,13 @@ import random
 from typing import Any, Dict, List, Optional
 
 from config import BOSS_DATA_DIR, BOSSES_INFO_FILE
+from core.boss_common import (
+    get_modifiers,
+    invalid_numeric_response,
+    normalize_boss_task,
+    parse_numeric_answer,
+    refresh_user_scores,
+)
 from core.level_run import BOSS_MAP, BOSS_NAMES
 
 ISLAND_BOSS_MAP = BOSS_MAP
@@ -55,15 +62,6 @@ def _load_boss_info() -> Dict[str, Any]:
         except (FileNotFoundError, json.JSONDecodeError):
             _BOSS_INFO = {}
     return _BOSS_INFO
-
-
-def _get_modifiers(user_id: str, storage) -> Dict[str, Any]:
-    try:
-        from handlers.effects_manager import calculate_modifiers
-
-        return calculate_modifiers(user_id, storage) or {}
-    except ImportError:
-        return {}
 
 
 def load_boss_tasks(boss_id: str) -> Optional[List[Dict[str, Any]]]:
@@ -173,15 +171,7 @@ def _apply_boss_ability_sync(
 
 
 def _normalize_boss_task(raw: Dict[str, Any], boss_id: str, idx: int) -> Dict[str, Any]:
-    answer = raw.get("answer", raw.get("correct_answer"))
-    return {
-        "id": raw.get("id") or f"boss_{boss_id}_{idx}",
-        "question": raw.get("question", ""),
-        "correct_answer": str(answer).strip(),
-        "hint": raw.get("hint", ""),
-        "island": boss_id,
-        "operation_type": "boss",
-    }
+    return normalize_boss_task(raw, boss_id, idx)
 
 
 def get_boss_max_health(boss_id: str) -> int:
@@ -432,12 +422,9 @@ def process_boss_answer(storage, score_manager, user_id: str, answer: str) -> Di
         return {"error": "Нет задач босса"}
 
     current = tasks[task_idx]
-    try:
-        given = float(str(answer).strip().replace(",", "."))
-        expected = float(current["answer"])
-        is_correct = abs(given - expected) < 0.01
-    except (ValueError, TypeError, KeyError):
-        return {"correct": False, "message": "🔢 Нужно ввести число", "retry_same_task": True}
+    is_correct, invalid_message = parse_numeric_answer(answer, current.get("answer"))
+    if invalid_message:
+        return invalid_numeric_response()
 
     user["tasks_solved"] = user.get("tasks_solved", 0) + 1
     if is_correct:
@@ -459,7 +446,7 @@ def process_boss_answer(storage, score_manager, user_id: str, answer: str) -> Di
                 boss_health = int(user.get("boss_health", boss_health))
                 break
 
-    modifiers = _get_modifiers(user_id, storage)
+    modifiers = get_modifiers(user_id, storage)
     reward = 0
 
     if is_correct:
@@ -484,10 +471,7 @@ def process_boss_answer(storage, score_manager, user_id: str, answer: str) -> Di
         user["boss_task_index"] = task_idx + 1
         message = "❌ Промах! Босс держится"
 
-    refreshed = storage.get_user(user_id)
-    if refreshed:
-        user["score_balance"] = refreshed.get("score_balance", user.get("score_balance", 0))
-        user["total_score"] = refreshed.get("total_score", user.get("total_score", 0))
+    user = refresh_user_scores(storage, user_id, user)
 
     storage.save_user(user_id, user)
 

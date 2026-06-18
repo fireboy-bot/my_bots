@@ -580,3 +580,130 @@ def test_true_lord_hint(client, seeded_user, user_id):
     assert body.get("hint")
     assert storage.get_user(user_id)["score_balance"] == balance_before - 10
     assert storage.get_user(user_id).get("true_lord_used_hint") is True
+
+
+def test_boss_start_includes_ok_and_active(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["unlocked_zones"] = list(set(user.get("unlocked_zones") or []) | {"addition"})
+    user["completed_zones"] = list(set(user.get("completed_zones") or []) | {"addition"})
+    storage.save_user(user_id, user)
+
+    r = client.post(
+        "/api/game/boss/start",
+        data=json.dumps({"user_id": user_id, "boss_id": "null_void"}),
+        content_type="application/json",
+    )
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("ok") is True
+    assert data.get("active") is True
+    assert data.get("task")
+
+
+def test_boss_state_matches_active_fight(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["unlocked_zones"] = list(set(user.get("unlocked_zones") or []) | {"addition"})
+    user["completed_zones"] = list(set(user.get("completed_zones") or []) | {"addition"})
+    storage.save_user(user_id, user)
+
+    start = client.post(
+        "/api/game/boss/start",
+        data=json.dumps({"user_id": user_id, "boss_id": "null_void"}),
+        content_type="application/json",
+    ).get_json()
+
+    state = client.get(f"/api/game/boss/state/{user_id}").get_json()
+    assert state.get("ok") is True
+    assert state.get("active") is True
+    assert state.get("boss_id") == start["boss_id"]
+    assert state.get("task", {}).get("id") == start["task"]["id"]
+
+
+def test_boss_answer_includes_battle_envelope(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["unlocked_zones"] = list(set(user.get("unlocked_zones") or []) | {"addition"})
+    user["completed_zones"] = list(set(user.get("completed_zones") or []) | {"addition"})
+    user["in_boss_battle"] = False
+    user["current_boss"] = None
+    user["true_lord_epic"] = False
+    user["current_level"] = None
+    user["selected_tasks"] = []
+    storage.save_user(user_id, user)
+
+    start = client.post(
+        "/api/game/boss/start",
+        data=json.dumps({"user_id": user_id, "boss_id": "null_void"}),
+        content_type="application/json",
+    ).get_json()
+    task = start["task"]
+
+    wrong = client.post(
+        "/api/game/check_answer",
+        data=json.dumps(
+            {
+                "user_id": user_id,
+                "answer": "99999",
+                "task_id": task["id"],
+                "expected_answer": task["correct_answer"],
+                "island_id": "null_void",
+                "operation_type": "boss",
+            }
+        ),
+        content_type="application/json",
+    ).get_json()
+
+    assert wrong.get("ok") is True
+    assert wrong.get("battle", {}).get("mode") == "boss"
+    assert wrong.get("boss_health") == wrong["battle"]["boss_health"]
+
+
+def test_true_lord_wrong_answer_retries_same_task(client, seeded_user, user_id):
+    user = storage.get_user(user_id)
+    user["defeated_bosses"] = ["time_keeper", "measure_keeper", "logic_keeper"]
+    user["unlocked_zones"] = list(
+        set(user.get("unlocked_zones") or [])
+        | {"time_world", "measure_world", "logic_world", "true_lord"}
+    )
+    user["in_boss_battle"] = False
+    user["current_level"] = None
+    user["selected_tasks"] = []
+    user["current_task_index"] = 0
+    storage.save_user(user_id, user)
+
+    start = client.post(
+        "/api/game/boss/start",
+        data=json.dumps({"user_id": user_id, "boss_id": "true_lord"}),
+        content_type="application/json",
+    ).get_json()
+    task_id = start["task"]["id"]
+
+    wrong = client.post(
+        "/api/game/check_answer",
+        data=json.dumps(
+            {
+                "user_id": user_id,
+                "answer": "99999",
+                "task_id": task_id,
+                "expected_answer": start["task"]["correct_answer"],
+                "island_id": "true_lord",
+                "operation_type": "boss",
+            }
+        ),
+        content_type="application/json",
+    ).get_json()
+
+    assert wrong.get("retry_same_task") is True
+    assert wrong.get("battle", {}).get("mode") == "true_lord"
+    assert wrong.get("next_task", {}).get("id") == task_id
+
+
+def test_boss_start_locked_returns_ok_false(client, seeded_user, user_id):
+    r = client.post(
+        "/api/game/boss/start",
+        data=json.dumps({"user_id": user_id, "boss_id": "final_boss"}),
+        content_type="application/json",
+    )
+    assert r.status_code == 403
+    body = r.get_json()
+    assert body.get("ok") is False
+    assert body.get("error")

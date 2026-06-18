@@ -90,7 +90,9 @@ class PlayerStorage:
         'in_boss_battle', 'in_secret_level', 'current_boss', 'boss_health',
         'boss_max_health', 'boss_turn', 'boss_task_index', 'just_completed_level',
         'true_lord_error_count', 'true_lord_consecutive_successes',
-        'true_lord_used_hint', 'true_lord_secret_unlocked', 'selected_tasks',
+        'true_lord_used_hint', 'true_lord_secret_unlocked', 'true_lord_epic',
+        'completed_normal_game', 'absolute_victory',
+        'selected_tasks',
         'selected_boss_tasks', 'boss_abilities_used',
         # 🔹 Chaos System поля (в game_state для быстрой сериализации)
         'consecutive_errors', 'chaos_energy', 'rift_stage', 'artifact_chaos_state',
@@ -448,7 +450,8 @@ class PlayerStorage:
                 elif field in ['selected_tasks', 'selected_boss_tasks', 'boss_abilities_used']:
                     data[field] = []
                 elif field in ['in_boss_battle', 'in_secret_level', 'just_completed_level', 
-                              'true_lord_used_hint', 'true_lord_secret_unlocked']:
+                              'true_lord_used_hint', 'true_lord_secret_unlocked', 'true_lord_epic',
+                              'completed_normal_game', 'absolute_victory']:
                     data[field] = False
                 else:
                     data[field] = None

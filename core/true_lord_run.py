@@ -8,6 +8,13 @@ import random
 from typing import Any, Dict, List, Optional, Tuple
 
 from config import BOSS_DATA_DIR
+from core.boss_common import (
+    get_modifiers,
+    invalid_numeric_response,
+    normalize_boss_task,
+    parse_numeric_answer,
+    refresh_user_scores,
+)
 from core.boss_run import TRUE_LORD_ID, can_start_boss, unlock_new_zones
 from core.level_run import _apply_xp_level_up
 
@@ -128,15 +135,6 @@ def _load_boss_data() -> Dict[str, Any]:
     return _BOSS_DATA
 
 
-def _get_modifiers(user_id: str, storage) -> Dict[str, Any]:
-    try:
-        from handlers.effects_manager import calculate_modifiers
-
-        return calculate_modifiers(user_id, storage) or {}
-    except ImportError:
-        return {}
-
-
 def get_phase(hp: int, max_hp: int = TRUE_LORD_MAX_HP) -> str:
     percent = (hp / max_hp) * 100 if max_hp else 0
     if percent <= PHASE_THRESHOLDS["desperate"]:
@@ -180,15 +178,7 @@ def _select_tasks() -> List[Dict[str, Any]]:
 
 
 def _normalize_task(raw: Dict[str, Any], idx: int) -> Dict[str, Any]:
-    answer = raw.get("answer", raw.get("correct_answer"))
-    return {
-        "id": f"true_lord_{idx}",
-        "question": raw.get("question", ""),
-        "correct_answer": str(answer).strip(),
-        "hint": raw.get("hint", ""),
-        "island": TRUE_LORD_ID,
-        "operation_type": "boss",
-    }
+    return normalize_boss_task(raw, TRUE_LORD_ID, idx)
 
 
 def _build_intro_dialogues() -> List[Dict[str, Any]]:
@@ -363,7 +353,7 @@ def process_true_lord_hint(storage, score_manager, user_id: str) -> Dict[str, An
     if idx >= len(tasks):
         return {"error": "Нет активной задачи"}
 
-    modifiers = _get_modifiers(user_id, storage)
+    modifiers = get_modifiers(user_id, storage)
     penalty = 0 if modifiers.get("hint_is_free") else 10
     xp_penalty = 0 if modifiers.get("hint_is_free") else 5
 
@@ -406,14 +396,11 @@ def process_true_lord_answer(storage, score_manager, user_id: str, answer: str) 
         return {"error": "Бой завершён"}
 
     current = tasks[idx]
-    try:
-        given = float(str(answer).strip().replace(",", "."))
-        expected = float(current["answer"])
-        is_correct = abs(given - expected) < 0.01
-    except (ValueError, TypeError, KeyError):
-        return {"correct": False, "message": "🔢 Нужно ввести число", "retry_same_task": True}
+    is_correct, invalid_message = parse_numeric_answer(answer, current.get("answer"))
+    if invalid_message:
+        return invalid_numeric_response()
 
-    modifiers = _get_modifiers(user_id, storage)
+    modifiers = get_modifiers(user_id, storage)
     dialogues: List[Dict[str, Any]] = []
     reward = 0
     level_up = None

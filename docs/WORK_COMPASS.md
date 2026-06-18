@@ -39,7 +39,12 @@ Staging: [http://147.45.225.173](http://147.45.225.173)
   - endpoint подсказки `/api/game/true-lord/hint`
   - абсолютная победа в `GameEventOverlay`
 - Nginx настроен отдавать аватары Истинного Владыки (`/images/true_lord_*.jpg`).
-- Smoke тесты API: `30 passed`.
+### 2026-06-18 (ядро)
+
+- `core/boss_common.py` — общие утилиты боя, `battle` envelope, поле `ok`
+- `web/response_helpers.py` — единые HTTP-обёртки для game API
+- `botAdapter` — soft errors (403 → `{error}` без throw), `normalizeAnswerResponse`, `getBossState`
+- Smoke: +5 тестов (boss state, battle envelope, retry_same_task)
 - Скрипты стабильности:
   - `scripts/configure-demo-user.py` — пост-гейм профиль для staging
   - `scripts/sync_user_db.py` + `scripts/sync-db.ps1` — синхронизация user/db bot ↔ VPS
@@ -51,7 +56,8 @@ Staging: [http://147.45.225.173](http://147.45.225.173)
 - [x] Инвентарь грузится
 - [x] Тайная комната открывается по условиям
 - [x] Бандл обновляется после деплоя
-- [ ] Полный ручной прогон эпик-боя Истинного Владыки на боевом профиле (демо настроен: `.\scripts\sync-db.ps1 configure-demo`)
+- [x] Полный API-прогон эпик-боя Истинного Владыки (`POST /boss/start` → `epic: true`, 60 задач)
+- [ ] Полный ручной UI-прогон True Lord в браузере
 - [x] Инструменты синхронизации БД bot ↔ VPS (`sync-db.ps1`, `sync_user_db.py`)
 
 ## Документация

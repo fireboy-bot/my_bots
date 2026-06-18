@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from database.storage import PlayerStorage, get_db_path
 from core.score_manager import ScoreManager
 from core.castle_engine import CastleEngine
+from core.boss_common import enrich_game_response
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +240,20 @@ class ChislyandiaEngine:
         if not user:
             return {"correct": False, "reward": 0, "message": "❌ Игрок не найден", "chaos_state": None, "transfer_task": None}
 
+        if user.get("in_boss_battle") and not is_transfer:
+            from core.boss_run import process_boss_answer
+
+            result = process_boss_answer(self.storage, self.score_manager, user_id, str(answer))
+            if not result.get("error"):
+                user = self.storage.get_user(user_id) or user
+                chaos_state = self._apply_chaos_tick(user, result.get("correct", is_correct))
+                self.storage.save_user(user_id, user)
+                result["level_up"] = bool(result.get("player_level_up") or result.get("level_up"))
+                result["chaos_state"] = chaos_state
+                result["transfer_task"] = None
+                return enrich_game_response(result, user)
+            return enrich_game_response(result, user)
+
         active_level = user.get("current_level")
         if active_level and not is_transfer and user.get("selected_tasks"):
             island = island_id or active_level
@@ -253,21 +268,8 @@ class ChislyandiaEngine:
                     result["level_up"] = bool(result.get("player_level_up"))
                     result["chaos_state"] = chaos_state
                     result["transfer_task"] = None
-                    return result
+                    return enrich_game_response(result, user)
 
-        if user.get("in_boss_battle") and not is_transfer:
-            from core.boss_run import process_boss_answer
-
-            result = process_boss_answer(self.storage, self.score_manager, user_id, str(answer))
-            if not result.get("error"):
-                user = self.storage.get_user(user_id) or user
-                chaos_state = self._apply_chaos_tick(user, result.get("correct", is_correct))
-                self.storage.save_user(user_id, user)
-                result["level_up"] = bool(result.get("player_level_up") or result.get("level_up"))
-                result["chaos_state"] = chaos_state
-                result["transfer_task"] = None
-                return result
-        
         # 🔹 Обновляем статистику ошибок (Chaos System)
         chaos_state = self._apply_chaos_tick(user, is_correct)
         rift_stage = chaos_state["rift_stage"]
@@ -368,16 +370,19 @@ class ChislyandiaEngine:
             pass
         
         # 🔹 Возвращаем расширенный ответ для витрины
-        return {
-            "correct": is_correct,
-            "reward": reward,
-            "message": message,
-            "level_up": level_up,
-            "chaos_state": chaos_state,
-            "transfer_task": transfer_task,
-            "new_balance": user.get("score_balance", 0),
-            "new_total_score": user.get("total_score", 0)
-        }
+        return enrich_game_response(
+            {
+                "correct": is_correct,
+                "reward": reward,
+                "message": message,
+                "level_up": level_up,
+                "chaos_state": chaos_state,
+                "transfer_task": transfer_task,
+                "new_balance": user.get("score_balance", 0),
+                "new_total_score": user.get("total_score", 0),
+            },
+            user,
+        )
     
     # =============================================================================
     # 🔥 СТАРЫЕ МЕТОДЫ (СОХРАНЕНЫ)

@@ -5,30 +5,78 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
 
-// 🔹 Вспомогательная функция для запросов
+function parseApiErrorBody(data, status) {
+  return data?.error || data?.message || `HTTP ${status}`;
+}
+
 async function apiFetch(endpoint, options = {}) {
+  const { softError = false, ...fetchOptions } = options;
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   try {
     const response = await fetch(url, {
-      ...options,
+      ...fetchOptions,
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers,
+        ...fetchOptions.headers,
       },
     });
-    
+
+    const data = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.warn(`🔹 API error (${endpoint}): HTTP ${response.status}:`, errorData);
-      throw new Error(`HTTP ${response.status}: ${JSON.stringify(errorData)}`);
+      const payload = {
+        ok: false,
+        error: parseApiErrorBody(data, response.status),
+        status: response.status,
+        ...data,
+      };
+      console.warn(`🔹 API error (${endpoint}): HTTP ${response.status}:`, data);
+      if (softError) return payload;
+      throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
     }
-    
-    return await response.json();
+
+    if (data.error && data.ok === false) {
+      return { ok: false, ...data };
+    }
+
+    return { ok: data.ok !== false, ...data };
   } catch (error) {
     console.warn(`🔹 API fetch error (${endpoint}):`, error.message);
+    if (softError) {
+      return { ok: false, error: error.message };
+    }
     throw error;
   }
+}
+
+/** Нормализует ответ checkAnswer: battle.* + level_up */
+export function normalizeAnswerResponse(data) {
+  if (!data) return data;
+
+  const battle = data.battle || {};
+  return {
+    ...data,
+    level_up: data.level_up ?? Boolean(data.player_level_up),
+    boss_health: data.boss_health ?? battle.boss_health,
+    boss_max_health: data.boss_max_health ?? battle.boss_max_health,
+    task_index: data.task_index ?? battle.task_index,
+    total_tasks: data.total_tasks ?? battle.total_tasks,
+    next_task: data.next_task ?? battle.next_task,
+    retry_same_task: data.retry_same_task ?? battle.retry_same_task,
+    boss_defeated: data.boss_defeated ?? battle.boss_defeated,
+    boss_failed: data.boss_failed ?? battle.boss_failed,
+    ability_triggered: data.ability_triggered ?? battle.ability_triggered,
+    phase: data.phase ?? battle.phase,
+    phase_name: data.phase_name ?? battle.phase_name,
+    avatar_url: data.avatar_url ?? battle.avatar_url,
+    phase_changed: data.phase_changed ?? battle.phase_changed,
+    dialogues: data.dialogues ?? battle.dialogues,
+    absolute_victory: data.absolute_victory ?? battle.absolute_victory,
+    finale_text: data.finale_text ?? battle.finale_text,
+    secret_text: data.secret_text ?? battle.secret_text,
+    battle,
+  };
 }
 
 // 🔹 Mock-данные для оффлайн-режима
@@ -45,31 +93,7 @@ const MOCK_TASKS = {
   ],
 };
 
-const MOCK_ANSWERS = {
-  success: {
-    correct: true,
-    reward: 10,
-    message: '✅ Правильно! +10 очков',
-    level_up: false,
-    chaos_state: { rift_stage: 0, chaos_energy: 0, artifact_state: 'dormant', consecutive_errors: 0 },
-    transfer_task: null,
-    new_balance: 100,
-    new_total_score: 100,
-  },
-  error: {
-    correct: false,
-    reward: -5,
-    message: '❌ Ошибка! -5 очков',
-    level_up: false,
-    chaos_state: { rift_stage: 1, chaos_energy: 20, artifact_state: 'awakened', consecutive_errors: 1 },
-    transfer_task: null,
-    new_balance: 95,
-    new_total_score: 95,
-  },
-};
-
 export const botApi = {
-  // 🔹 Получить задачу
   async getTask(userId, world = 'addition') {
     try {
       return await apiFetch(`/api/game/task?user_id=${encodeURIComponent(userId)}&world=${encodeURIComponent(world)}`);
@@ -80,9 +104,8 @@ export const botApi = {
     }
   },
 
-  // 🔹 Проверить ответ — ИСПРАВЛЕНО: возвращаем объект, не строку!
   async checkAnswer(data) {
-    return await apiFetch('/api/game/check_answer', {
+    const result = await apiFetch('/api/game/check_answer', {
       method: 'POST',
       body: JSON.stringify({
         user_id: data.user_id?.toString(),
@@ -94,9 +117,9 @@ export const botApi = {
         is_transfer: data.is_transfer || false,
       }),
     });
+    return normalizeAnswerResponse(result);
   },
 
-  // 🔹 Профиль игрока
   async getPlayerProfile(userId) {
     try {
       return await apiFetch(`/api/player/${encodeURIComponent(userId)}/profile`);
@@ -120,19 +143,18 @@ export const botApi = {
     }
   },
 
-  // 🔹 Каталог миров / островов
   async getWorlds(userId) {
-    return await apiFetch(`/api/game/worlds/${encodeURIComponent(userId)}`);
+    return await apiFetch(`/api/game/worlds/${encodeURIComponent(userId)}`, { softError: true });
   },
 
   async getBosses(userId) {
-    return await apiFetch(`/api/game/bosses/${encodeURIComponent(userId)}`);
+    return await apiFetch(`/api/game/bosses/${encodeURIComponent(userId)}`, { softError: true });
   },
 
-  // 🔹 Старт забега по острову (10 задач)
   async startLevel(userId, world) {
     return await apiFetch('/api/game/level/start', {
       method: 'POST',
+      softError: true,
       body: JSON.stringify({ user_id: userId, world }),
     });
   },
@@ -140,8 +162,13 @@ export const botApi = {
   async startBoss(userId, bossId) {
     return await apiFetch('/api/game/boss/start', {
       method: 'POST',
+      softError: true,
       body: JSON.stringify({ user_id: userId, boss_id: bossId }),
     });
+  },
+
+  async getBossState(userId) {
+    return await apiFetch(`/api/game/boss/state/${encodeURIComponent(userId)}`, { softError: true });
   },
 
   async exitBoss(userId) {
@@ -154,11 +181,11 @@ export const botApi = {
   async trueLordHint(userId) {
     return await apiFetch('/api/game/true-lord/hint', {
       method: 'POST',
+      softError: true,
       body: JSON.stringify({ user_id: userId }),
     });
   },
 
-  // 🔹 Банк
   async getBankInfo(userId) {
     try {
       return await apiFetch(`/api/bank/${encodeURIComponent(userId)}`);
@@ -189,7 +216,6 @@ export const botApi = {
     }
   },
 
-  // 🔹 Замок
   async getCastleInfo(userId) {
     try {
       return await apiFetch(`/api/castle/${encodeURIComponent(userId)}`);
@@ -223,12 +249,10 @@ export const botApi = {
     }
   },
 
-  /** @deprecated используй upgradeDecoration */
   upgradeCastleDecoration(userId, decorationId) {
     return this.upgradeDecoration(userId, decorationId);
   },
 
-  // 🔹 Артефакты
   async getArtifacts(userId) {
     try {
       return await apiFetch(`/api/artifacts/${encodeURIComponent(userId)}`);
